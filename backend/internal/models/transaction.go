@@ -39,6 +39,8 @@ type Transaction struct {
 	AmountCents int64             `db:"amount_cents"`
 	ID          uuid.UUID         `db:"id"`
 	AccountID   uuid.UUID         `db:"account_id"`
+	OrderID     *uuid.UUID        `db:"order_id"`
+	CustomerID  *uuid.UUID        `db:"customer_id"`
 }
 
 // IdempotencyKey tracks processed requests to prevent duplicate transactions

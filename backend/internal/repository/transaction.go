@@ -6,9 +6,9 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/google/uuid"
 	"github.com/tusharui/payment-gateway/backend/internal/db"
 	"github.com/tusharui/payment-gateway/backend/internal/models"
-	"github.com/google/uuid"
 )
 
 // TransactionRepository defines the interface for transaction data access
@@ -48,15 +48,17 @@ func (r *transactionRepository) Create(ctx context.Context, tx *models.Transacti
 
 	query := `
 		INSERT INTO transactions (
-			id, account_id, type, amount_cents, currency,
+			id, account_id, order_id, customer_id, type, amount_cents, currency,
 			reference_id, status, expires_at, metadata, created_at
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, COALESCE($10, NOW()))
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, COALESCE($12, NOW()))
 	`
 
 	_, err := r.exec.ExecContext(
 		ctx, query,
 		tx.ID,
 		tx.AccountID,
+		tx.OrderID,
+		tx.CustomerID,
 		tx.Type,
 		tx.AmountCents,
 		tx.Currency,
@@ -79,7 +81,7 @@ func (r *transactionRepository) Create(ctx context.Context, tx *models.Transacti
 // FindByID retrieves a transaction by its ID
 func (r *transactionRepository) FindByID(ctx context.Context, id uuid.UUID) (*models.Transaction, error) {
 	query := `
-		SELECT id, account_id, type, amount_cents, currency,
+		SELECT id, account_id, order_id, customer_id, type, amount_cents, currency,
 		       reference_id, status, expires_at, metadata, created_at
 		FROM transactions
 		WHERE id = $1
@@ -91,6 +93,8 @@ func (r *transactionRepository) FindByID(ctx context.Context, id uuid.UUID) (*mo
 	err := r.exec.QueryRowContext(ctx, query, id).Scan(
 		&tx.ID,
 		&tx.AccountID,
+		&tx.OrderID,
+		&tx.CustomerID,
 		&tx.Type,
 		&tx.AmountCents,
 		&tx.Currency,
@@ -121,7 +125,7 @@ func (r *transactionRepository) FindByID(ctx context.Context, id uuid.UUID) (*mo
 // This must be called within a transaction to prevent race conditions
 func (r *transactionRepository) FindByIDForUpdate(ctx context.Context, id uuid.UUID) (*models.Transaction, error) {
 	query := `
-		SELECT id, account_id, type, amount_cents, currency,
+		SELECT id, account_id, order_id, customer_id, type, amount_cents, currency,
 		       reference_id, status, expires_at, metadata, created_at
 		FROM transactions
 		WHERE id = $1
@@ -134,6 +138,8 @@ func (r *transactionRepository) FindByIDForUpdate(ctx context.Context, id uuid.U
 	err := r.exec.QueryRowContext(ctx, query, id).Scan(
 		&tx.ID,
 		&tx.AccountID,
+		&tx.OrderID,
+		&tx.CustomerID,
 		&tx.Type,
 		&tx.AmountCents,
 		&tx.Currency,
@@ -164,7 +170,7 @@ func (r *transactionRepository) FindByIDForUpdate(ctx context.Context, id uuid.U
 // This is used to check if a capture/void/refund already exists for an authorization/capture
 func (r *transactionRepository) FindByReferenceID(ctx context.Context, refID uuid.UUID, txnType models.TransactionType) (*models.Transaction, error) {
 	query := `
-		SELECT id, account_id, type, amount_cents, currency,
+		SELECT id, account_id, order_id, customer_id, type, amount_cents, currency,
 		       reference_id, status, expires_at, metadata, created_at
 		FROM transactions
 		WHERE reference_id = $1 AND type = $2
@@ -177,6 +183,8 @@ func (r *transactionRepository) FindByReferenceID(ctx context.Context, refID uui
 	err := r.exec.QueryRowContext(ctx, query, refID, txnType).Scan(
 		&tx.ID,
 		&tx.AccountID,
+		&tx.OrderID,
+		&tx.CustomerID,
 		&tx.Type,
 		&tx.AmountCents,
 		&tx.Currency,
