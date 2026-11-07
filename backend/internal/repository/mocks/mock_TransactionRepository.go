@@ -5,8 +5,10 @@ package mocks
 import (
 	context "context"
 
-	models "github.com/tusharui/payment-gateway/backend/internal/models"
 	mock "github.com/stretchr/testify/mock"
+	models "github.com/tusharui/payment-gateway/backend/internal/models"
+
+	time "time"
 
 	uuid "github.com/google/uuid"
 )
@@ -245,6 +247,67 @@ func (_c *MockTransactionRepository_FindByReferenceID_Call) Return(_a0 *models.T
 }
 
 func (_c *MockTransactionRepository_FindByReferenceID_Call) RunAndReturn(run func(context.Context, uuid.UUID, models.TransactionType) (*models.Transaction, error)) *MockTransactionRepository_FindByReferenceID_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// FindExpiredAuthorizations provides a mock function with given fields: ctx, now, afterID, limit
+func (_m *MockTransactionRepository) FindExpiredAuthorizations(ctx context.Context, now time.Time, afterID uuid.UUID, limit int) ([]models.Transaction, error) {
+	ret := _m.Called(ctx, now, afterID, limit)
+
+	if len(ret) == 0 {
+		panic("no return value specified for FindExpiredAuthorizations")
+	}
+
+	var r0 []models.Transaction
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, time.Time, uuid.UUID, int) ([]models.Transaction, error)); ok {
+		return rf(ctx, now, afterID, limit)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, time.Time, uuid.UUID, int) []models.Transaction); ok {
+		r0 = rf(ctx, now, afterID, limit)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]models.Transaction)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, time.Time, uuid.UUID, int) error); ok {
+		r1 = rf(ctx, now, afterID, limit)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockTransactionRepository_FindExpiredAuthorizations_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'FindExpiredAuthorizations'
+type MockTransactionRepository_FindExpiredAuthorizations_Call struct {
+	*mock.Call
+}
+
+// FindExpiredAuthorizations is a helper method to define mock.On call
+//   - ctx context.Context
+//   - now time.Time
+//   - afterID uuid.UUID
+//   - limit int
+func (_e *MockTransactionRepository_Expecter) FindExpiredAuthorizations(ctx interface{}, now interface{}, afterID interface{}, limit interface{}) *MockTransactionRepository_FindExpiredAuthorizations_Call {
+	return &MockTransactionRepository_FindExpiredAuthorizations_Call{Call: _e.mock.On("FindExpiredAuthorizations", ctx, now, afterID, limit)}
+}
+
+func (_c *MockTransactionRepository_FindExpiredAuthorizations_Call) Run(run func(ctx context.Context, now time.Time, afterID uuid.UUID, limit int)) *MockTransactionRepository_FindExpiredAuthorizations_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(time.Time), args[2].(uuid.UUID), args[3].(int))
+	})
+	return _c
+}
+
+func (_c *MockTransactionRepository_FindExpiredAuthorizations_Call) Return(_a0 []models.Transaction, _a1 error) *MockTransactionRepository_FindExpiredAuthorizations_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockTransactionRepository_FindExpiredAuthorizations_Call) RunAndReturn(run func(context.Context, time.Time, uuid.UUID, int) ([]models.Transaction, error)) *MockTransactionRepository_FindExpiredAuthorizations_Call {
 	_c.Call.Return(run)
 	return _c
 }

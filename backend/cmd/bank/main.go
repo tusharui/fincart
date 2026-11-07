@@ -14,6 +14,7 @@ import (
 	"github.com/tusharui/payment-gateway/backend/internal/db"
 	"github.com/tusharui/payment-gateway/backend/internal/handlers"
 	"github.com/tusharui/payment-gateway/backend/internal/repository"
+	"github.com/tusharui/payment-gateway/backend/internal/service"
 )
 
 func main() {
@@ -96,17 +97,70 @@ func cleanupIdempotencyKeys(ctx context.Context, database *db.DB, logger *slog.L
 	}
 }
 
-// runPeriodicCleanup runs idempotency key cleanup every hour
+// sweepExpiredAuthorizations releases funds held by authorizations that were
+// never captured or voided before their expiry time.
+func sweepExpiredAuthorizations(ctx context.Context, database *db.DB, logger *slog.Logger) {
+	expiryService := service.NewExpiryService(database)
+
+	expiredCount, err := expiryService.ExpireAuthorizations(ctx, time.Now())
+	if err != nil {
+		logger.Warn("authorization expiry sweep completed with errors",
+			"error", err,
+			"expired", expiredCount,
+		)
+		return
+	}
+	if expiredCount > 0 {
+		logger.Info("expired abandoned authorizations", "count", expiredCount)
+	}
+}
+
+const (
+	// authorizationSweepInterval controls how often expired authorization
+	// holds are released.
+	authorizationSweepInterval = 1 * time.Minute
+
+	// idempotencyCleanupInterval controls how often old idempotency keys
+	// are purged.
+	idempotencyCleanupInterval = 1 * time.Hour
+
+	// periodicTaskTimeout bounds a single cleanup pass.
+	periodicTaskTimeout = 30 * time.Second
+)
+
+// runPeriodicCleanup runs the authorization expiry sweep and idempotency key
+// cleanup on their own schedules. Both run once at startup so a restart clears
+// any backlog immediately.
 func runPeriodicCleanup(database *db.DB, logger *slog.Logger, stop <-chan struct{}) {
-	ticker := time.NewTicker(1 * time.Hour)
-	defer ticker.Stop()
+	sweepTicker := time.NewTicker(authorizationSweepInterval)
+	cleanupTicker := time.NewTicker(idempotencyCleanupInterval)
+	defer sweepTicker.Stop()
+	defer cleanupTicker.Stop()
+
+	runWithTimeout := func(task func(context.Context)) {
+		ctx, cancel := context.WithTimeout(context.Background(), periodicTaskTimeout)
+		defer cancel()
+
+		task(ctx)
+	}
+
+	runWithTimeout(func(ctx context.Context) {
+		sweepExpiredAuthorizations(ctx, database, logger)
+	})
+	runWithTimeout(func(ctx context.Context) {
+		cleanupIdempotencyKeys(ctx, database, logger)
+	})
 
 	for {
 		select {
-		case <-ticker.C:
-			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-			cleanupIdempotencyKeys(ctx, database, logger)
-			cancel()
+		case <-sweepTicker.C:
+			runWithTimeout(func(ctx context.Context) {
+				sweepExpiredAuthorizations(ctx, database, logger)
+			})
+		case <-cleanupTicker.C:
+			runWithTimeout(func(ctx context.Context) {
+				cleanupIdempotencyKeys(ctx, database, logger)
+			})
 		case <-stop:
 			logger.Info("stopping periodic cleanup")
 			return

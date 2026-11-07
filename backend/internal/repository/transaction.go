@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/tusharui/payment-gateway/backend/internal/db"
@@ -18,6 +19,7 @@ type TransactionRepository interface {
 	FindByID(ctx context.Context, id uuid.UUID) (*models.Transaction, error)
 	FindByIDForUpdate(ctx context.Context, id uuid.UUID) (*models.Transaction, error)
 	FindByReferenceID(ctx context.Context, refID uuid.UUID, txnType models.TransactionType) (*models.Transaction, error)
+	FindExpiredAuthorizations(ctx context.Context, now time.Time, afterID uuid.UUID, limit int) ([]models.Transaction, error)
 	UpdateStatus(ctx context.Context, id uuid.UUID, status models.TransactionStatus) error
 }
 
@@ -96,6 +98,29 @@ func (r *transactionRepository) FindByReferenceID(ctx context.Context, refID uui
 	}
 
 	return &tx, nil
+}
+
+// FindExpiredAuthorizations returns active authorization holds whose expiry
+// time has passed, in stable ID order. Pass a zero UUID for the first page;
+// subsequent pages use the last ID from the previous page. The limit is capped
+// to a sane default when non-positive.
+func (r *transactionRepository) FindExpiredAuthorizations(ctx context.Context, now time.Time, afterID uuid.UUID, limit int) ([]models.Transaction, error) {
+	if limit <= 0 {
+		limit = 500
+	}
+
+	var txs []models.Transaction
+	err := r.db.WithContext(ctx).
+		Where("type = ? AND status = ? AND expires_at IS NOT NULL AND expires_at <= ? AND id > ?",
+			models.TransactionTypeAuthHold, models.TransactionStatusActive, now, afterID).
+		Order("id").
+		Limit(limit).
+		Find(&txs).Error
+	if err != nil {
+		return nil, fmt.Errorf("failed to find expired authorizations: %w", err)
+	}
+
+	return txs, nil
 }
 
 // UpdateStatus updates the status of a transaction.

@@ -229,6 +229,97 @@ func TestTransactionRepository_FindByReferenceID(t *testing.T) {
 	}
 }
 
+func TestTransactionRepository_FindExpiredAuthorizations(t *testing.T) {
+	database := setupTestDB(t)
+	defer cleanupTestDB(t, database)
+	truncateTables(t, database)
+
+	repo := NewTransactionRepository(database.GORM())
+	accountRepo := NewAccountRepository(database.GORM())
+	ctx := context.Background()
+
+	account, err := accountRepo.FindByCardToken(ctx, security.HashToken("4111111111111111"))
+	require.NoError(t, err, "failed to get account")
+
+	now := time.Now()
+
+	transactions := []*models.Transaction{
+		{
+			AccountID:   account.ID,
+			Type:        models.TransactionTypeAuthHold,
+			AmountCents: 1000,
+			Currency:    "USD",
+			Status:      models.TransactionStatusActive,
+			ExpiresAt:   timePtr(now.Add(-2 * time.Hour)),
+		},
+		{
+			AccountID:   account.ID,
+			Type:        models.TransactionTypeAuthHold,
+			AmountCents: 2000,
+			Currency:    "USD",
+			Status:      models.TransactionStatusActive,
+			ExpiresAt:   timePtr(now.Add(-1 * time.Hour)),
+		},
+		{
+			AccountID:   account.ID,
+			Type:        models.TransactionTypeAuthHold,
+			AmountCents: 3000,
+			Currency:    "USD",
+			Status:      models.TransactionStatusActive,
+			ExpiresAt:   timePtr(now.Add(1 * time.Hour)),
+		},
+		{
+			AccountID:   account.ID,
+			Type:        models.TransactionTypeAuthHold,
+			AmountCents: 4000,
+			Currency:    "USD",
+			Status:      models.TransactionStatusCompleted,
+			ExpiresAt:   timePtr(now.Add(-1 * time.Hour)),
+		},
+		{
+			AccountID:   account.ID,
+			Type:        models.TransactionTypeCapture,
+			AmountCents: 5000,
+			Currency:    "USD",
+			Status:      models.TransactionStatusActive,
+			ExpiresAt:   timePtr(now.Add(-1 * time.Hour)),
+		},
+		{
+			AccountID:   account.ID,
+			Type:        models.TransactionTypeAuthHold,
+			AmountCents: 6000,
+			Currency:    "USD",
+			Status:      models.TransactionStatusActive,
+		},
+	}
+
+	for _, txn := range transactions {
+		require.NoError(t, repo.Create(ctx, txn), "failed to create transaction")
+	}
+
+	var found []models.Transaction
+	cursor := uuid.Nil
+	for {
+		batch, err := repo.FindExpiredAuthorizations(ctx, now, cursor, 1)
+		require.NoError(t, err)
+
+		if len(batch) == 0 {
+			break
+		}
+
+		found = append(found, batch...)
+		cursor = batch[len(batch)-1].ID
+	}
+
+	require.Len(t, found, 2, "expected only expired active authorization holds")
+	for _, txn := range found {
+		assert.Equal(t, models.TransactionTypeAuthHold, txn.Type)
+		assert.Equal(t, models.TransactionStatusActive, txn.Status)
+		require.NotNil(t, txn.ExpiresAt)
+		assert.False(t, txn.ExpiresAt.After(now), "returned authorization should be expired")
+	}
+}
+
 func TestTransactionRepository_UpdateStatus(t *testing.T) {
 	database := setupTestDB(t)
 	defer cleanupTestDB(t, database)

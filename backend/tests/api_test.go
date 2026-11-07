@@ -2,15 +2,20 @@
 package tests
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/tusharui/payment-gateway/backend/internal/models"
+	"github.com/tusharui/payment-gateway/backend/internal/service"
 )
 
 func TestAuthorizeAndCapture(t *testing.T) {
@@ -332,6 +337,53 @@ func TestConcurrentCaptures_OnlyOneSucceeds(t *testing.T) {
 
 	assert.Equal(t, 1, successCount, "exactly one capture should succeed")
 	assert.Equal(t, numGoroutines-1, conflictCount, "all others should conflict")
+}
+
+func TestAuthorizationExpirySweepReleasesFunds(t *testing.T) {
+	ts := SetupTest(t)
+	defer ts.Close()
+
+	authResp := ts.Authorize(t, "4111111111111111", "123", 10000, "expiry-sweep-key")
+	require.Equal(t, http.StatusOK, authResp.StatusCode)
+
+	var authBody map[string]any
+	require.NoError(t, json.NewDecoder(authResp.Body).Decode(&authBody))
+	authResp.Body.Close()
+
+	formattedID := authBody["authorization_id"].(string)
+	authID, err := uuid.Parse(strings.TrimPrefix(formattedID, "auth_"))
+	require.NoError(t, err)
+
+	// Age the authorization so the sweep treats it as expired.
+	past := time.Now().Add(-time.Hour)
+	require.NoError(t, ts.Database.GORM().
+		Model(&models.Transaction{}).
+		Where("id = ?", authID).
+		Update("expires_at", past).Error)
+
+	expiryService := service.NewExpiryService(ts.Database)
+	expiredCount, err := expiryService.ExpireAuthorizations(context.Background(), time.Now())
+	require.NoError(t, err)
+	assert.Equal(t, 1, expiredCount, "one authorization should be expired")
+
+	var authTxn models.Transaction
+	require.NoError(t, ts.Database.GORM().First(&authTxn, "id = ?", authID).Error)
+	assert.Equal(t, models.TransactionStatusExpired, authTxn.Status)
+
+	var account models.Account
+	require.NoError(t, ts.Database.GORM().First(&account, "id = ?", authTxn.AccountID).Error)
+	assert.Equal(t, int64(1000000), account.AvailableBalanceCents,
+		"reserved funds should be returned to the available balance")
+
+	// A second sweep must be a no-op.
+	expiredCount, err = expiryService.ExpireAuthorizations(context.Background(), time.Now())
+	require.NoError(t, err)
+	assert.Equal(t, 0, expiredCount)
+
+	// An expired authorization can no longer be captured.
+	captureResp := ts.Capture(t, formattedID, 10000, "expiry-sweep-capture")
+	assert.Equal(t, http.StatusConflict, captureResp.StatusCode)
+	captureResp.Body.Close()
 }
 
 func TestGetAuthorization(t *testing.T) {
