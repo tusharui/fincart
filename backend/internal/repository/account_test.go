@@ -7,13 +7,14 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/tusharui/payment-gateway/backend/internal/security"
 )
 
 func TestAccountRepository_FindByCardToken(t *testing.T) {
 	database := setupTestDB(t)
 	defer cleanupTestDB(t, database)
 
-	repo := NewAccountRepository(database)
+	repo := NewAccountRepository(database.GORM())
 
 	tests := []struct {
 		name      string
@@ -23,13 +24,13 @@ func TestAccountRepository_FindByCardToken(t *testing.T) {
 	}{
 		{
 			name:      "existing account",
-			cardToken: "4111111111111111",
+			cardToken: security.HashToken("4111111111111111"),
 			wantErr:   false,
-			wantLast4: "123",
+			wantLast4: "1111",
 		},
 		{
 			name:      "non-existent account",
-			cardToken: "9999999999999999",
+			cardToken: security.HashToken("9999999999999999"),
 			wantErr:   true,
 		},
 	}
@@ -48,7 +49,7 @@ func TestAccountRepository_FindByCardToken(t *testing.T) {
 			require.NotNil(t, account, "expected account")
 
 			assert.Equal(t, tt.cardToken, account.CardToken, "account number mismatch")
-			assert.Equal(t, tt.wantLast4, account.Last4, "CVV mismatch")
+			assert.Equal(t, tt.wantLast4, account.Last4, "last4 mismatch")
 			assert.NotEqual(t, uuid.Nil, account.ID, "account ID should not be nil")
 		})
 	}
@@ -58,9 +59,9 @@ func TestAccountRepository_FindByID(t *testing.T) {
 	database := setupTestDB(t)
 	defer cleanupTestDB(t, database)
 
-	repo := NewAccountRepository(database)
+	repo := NewAccountRepository(database.GORM())
 
-	existingAccount, setupErr := repo.FindByCardToken(context.Background(), "4111111111111111")
+	existingAccount, setupErr := repo.FindByCardToken(context.Background(), security.HashToken("4111111111111111"))
 	require.NoError(t, setupErr, "failed to get existing account")
 
 	tests := []struct {
@@ -99,9 +100,9 @@ func TestAccountRepository_AdjustBalances(t *testing.T) {
 	database := setupTestDB(t)
 	defer cleanupTestDB(t, database)
 
-	repo := NewAccountRepository(database)
+	repo := NewAccountRepository(database.GORM())
 
-	account, setupErr := repo.FindByCardToken(context.Background(), "4111111111111111")
+	account, setupErr := repo.FindByCardToken(context.Background(), security.HashToken("4111111111111111"))
 	require.NoError(t, setupErr, "failed to get existing account")
 
 	initialBalance := account.BalanceCents
@@ -204,9 +205,9 @@ func TestAccountRepository_AdjustBalances_Concurrent(t *testing.T) {
 	defer cleanupTestDB(t, database)
 	truncateTables(t, database)
 
-	repo := NewAccountRepository(database)
+	repo := NewAccountRepository(database.GORM())
 
-	account, setupErr := repo.FindByCardToken(context.Background(), "4111111111111111")
+	account, setupErr := repo.FindByCardToken(context.Background(), security.HashToken("4111111111111111"))
 	require.NoError(t, setupErr, "failed to get account")
 
 	initialBalance := account.BalanceCents

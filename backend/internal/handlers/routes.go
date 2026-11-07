@@ -34,7 +34,7 @@ func NewRouter(
 
 	finalHandler = middleware.FailureInjection(&cfg.App, logger)(finalHandler)
 
-	idempotencyRepo := repository.NewIdempotencyRepository(database)
+	idempotencyRepo := repository.NewIdempotencyRepository(database.GORM())
 	finalHandler = middleware.Idempotency(idempotencyRepo, logger)(finalHandler)
 
 	return finalHandler

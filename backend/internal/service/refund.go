@@ -7,10 +7,11 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/tusharui/payment-gateway/backend/internal/db"
 	"github.com/tusharui/payment-gateway/backend/internal/models"
 	"github.com/tusharui/payment-gateway/backend/internal/repository"
-	"github.com/google/uuid"
+	"gorm.io/gorm"
 )
 
 // RefundService handles refund operations
@@ -27,30 +28,21 @@ func NewRefundService(database *db.DB) *RefundService {
 
 // Refund refunds a captured payment
 func (s *RefundService) Refund(ctx context.Context, captureID uuid.UUID, amount int64) (*models.Transaction, error) {
-	tx, err := s.db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelReadCommitted})
-	if err != nil {
-		return nil, &ServiceError{
-			Code:    ErrCodeInternalError,
-			Message: fmt.Sprintf("failed to start transaction: %v", err),
+	var refundTxn *models.Transaction
+	err := s.db.GORM().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		transactionRepo := repository.NewTransactionRepository(tx)
+		accountRepo := repository.NewAccountRepository(tx)
+
+		result, err := s.performRefund(ctx, transactionRepo, accountRepo, captureID, amount)
+		if err != nil {
+			return err
 		}
-	}
-	defer func() {
-		_ = tx.Rollback() //nolint:errcheck // rollback error is not critical in defer
-	}()
 
-	txTransactionRepo := repository.NewTransactionRepository(tx)
-	txAccountRepo := repository.NewAccountRepository(tx)
-
-	refundTxn, err := s.performRefund(ctx, txTransactionRepo, txAccountRepo, captureID, amount)
+		refundTxn = result
+		return nil
+	}, &sql.TxOptions{Isolation: sql.LevelReadCommitted})
 	if err != nil {
 		return nil, err
-	}
-
-	if err := tx.Commit(); err != nil {
-		return nil, &ServiceError{
-			Code:    ErrCodeInternalError,
-			Message: fmt.Sprintf("failed to commit transaction: %v", err),
-		}
 	}
 
 	return refundTxn, nil
@@ -123,7 +115,7 @@ func (s *RefundService) performRefund(
 
 // GetRefund retrieves a refund by ID
 func (s *RefundService) GetRefund(ctx context.Context, refundID uuid.UUID) (*models.Transaction, error) {
-	repo := repository.NewTransactionRepository(s.db)
+	repo := repository.NewTransactionRepository(s.db.GORM())
 	txn, err := repo.FindByID(ctx, refundID)
 	if err != nil || txn.Type != models.TransactionTypeRefund {
 		return nil, &ServiceError{

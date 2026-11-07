@@ -7,8 +7,11 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/tusharui/payment-gateway/backend/internal/config"
 	"github.com/tusharui/payment-gateway/backend/internal/db"
+	"github.com/tusharui/payment-gateway/backend/internal/models"
+	"github.com/tusharui/payment-gateway/backend/internal/security"
 )
 
 func setupTestDB(t *testing.T) *db.DB {
@@ -58,23 +61,40 @@ func cleanupTestDB(t *testing.T, database *db.DB) {
 func truncateTables(t *testing.T, database *db.DB) {
 	t.Helper()
 
-	tables := []string{"transactions", "idempotency_keys"}
-	for _, table := range tables {
-		_, err := database.ExecContext(context.Background(), "TRUNCATE TABLE "+table+" CASCADE")
-		if err != nil {
-			t.Fatalf("failed to truncate table %s: %v", table, err)
-		}
+	_, err := database.ExecContext(context.Background(),
+		"TRUNCATE TABLE transactions, idempotency_keys, accounts CASCADE")
+	if err != nil {
+		t.Fatalf("failed to truncate tables: %v", err)
 	}
 
-	_, err := database.ExecContext(context.Background(), `
-		DELETE FROM accounts;
-		INSERT INTO accounts (account_number, cvv, expiry_month, expiry_year, balance_cents, available_balance_cents) VALUES
-			('4111111111111111', '123', 12, 2030, 1000000, 1000000),
-			('4242424242424242', '456', 6, 2030, 50000, 50000),
-			('5555555555554444', '789', 9, 2030, 0, 0),
-			('5105105105105100', '321', 3, 2020, 500000, 500000);
-	`)
-	if err != nil {
-		t.Fatalf("failed to reset accounts: %v", err)
+	seedAccounts(t, database)
+}
+
+// seedAccounts inserts the standard tokenized test accounts through GORM so the
+// fixtures always match the current schema.
+func seedAccounts(t *testing.T, database *db.DB) {
+	t.Helper()
+
+	accounts := []models.Account{
+		{
+			ID: uuid.New(), CardToken: security.HashToken("4111111111111111"), Last4: "1111",
+			ExpiryMonth: 12, ExpiryYear: 2030, BalanceCents: 1000000, AvailableBalanceCents: 1000000,
+		},
+		{
+			ID: uuid.New(), CardToken: security.HashToken("4242424242424242"), Last4: "4242",
+			ExpiryMonth: 6, ExpiryYear: 2030, BalanceCents: 50000, AvailableBalanceCents: 50000,
+		},
+		{
+			ID: uuid.New(), CardToken: security.HashToken("5555555555554444"), Last4: "4444",
+			ExpiryMonth: 9, ExpiryYear: 2030, BalanceCents: 0, AvailableBalanceCents: 0,
+		},
+		{
+			ID: uuid.New(), CardToken: security.HashToken("5105105105105100"), Last4: "5100",
+			ExpiryMonth: 3, ExpiryYear: 2020, BalanceCents: 500000, AvailableBalanceCents: 500000,
+		},
+	}
+
+	if err := database.GORM().Create(&accounts).Error; err != nil {
+		t.Fatalf("failed to seed accounts: %v", err)
 	}
 }

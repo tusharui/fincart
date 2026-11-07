@@ -2,13 +2,14 @@ package repository
 
 import (
 	"context"
-	"database/sql"
-	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/google/uuid"
 	"github.com/tusharui/payment-gateway/backend/internal/db"
 	"github.com/tusharui/payment-gateway/backend/internal/models"
+	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 // TransactionRepository defines the interface for transaction data access
@@ -20,56 +21,26 @@ type TransactionRepository interface {
 	UpdateStatus(ctx context.Context, id uuid.UUID, status models.TransactionStatus) error
 }
 
+// transactionRepository implements TransactionRepository using GORM.
 type transactionRepository struct {
-	exec db.Executor
+	db *gorm.DB
 }
 
-// NewTransactionRepository creates a new TransactionRepository
-// The exec parameter can be either *db.DB or *db.Tx, allowing the repository
-// to work with or without transactions
-func NewTransactionRepository(exec db.Executor) TransactionRepository {
-	return &transactionRepository{exec: exec}
+// NewTransactionRepository creates a new TransactionRepository.
+// Passing a transactional *gorm.DB lets the repository participate in an
+// enclosing transaction without changing its API.
+func NewTransactionRepository(db *gorm.DB) TransactionRepository {
+	return &transactionRepository{db: db}
 }
 
-// Create inserts a new transaction into the database
+// Create inserts a new transaction into the database.
 func (r *transactionRepository) Create(ctx context.Context, tx *models.Transaction) error {
 	if tx.ID == uuid.Nil {
 		tx.ID = uuid.New()
 	}
 
-	var metadataJSON *[]byte
-	if tx.Metadata != nil {
-		jsonBytes, err := json.Marshal(tx.Metadata)
-		if err != nil {
-			return fmt.Errorf("failed to marshal metadata: %w", err)
-		}
-		metadataJSON = &jsonBytes
-	}
-
-	query := `
-		INSERT INTO transactions (
-			id, account_id, order_id, customer_id, type, amount_cents, currency,
-			reference_id, status, expires_at, metadata, created_at
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, COALESCE($12, NOW()))
-	`
-
-	_, err := r.exec.ExecContext(
-		ctx, query,
-		tx.ID,
-		tx.AccountID,
-		tx.OrderID,
-		tx.CustomerID,
-		tx.Type,
-		tx.AmountCents,
-		tx.Currency,
-		tx.ReferenceID,
-		tx.Status,
-		tx.ExpiresAt,
-		metadataJSON,
-		tx.CreatedAt,
-	)
-	if err != nil {
-		if db.IsUniqueViolation(err) {
+	if err := r.db.WithContext(ctx).Create(tx).Error; err != nil {
+		if db.IsUniqueViolation(err) || errors.Is(err, gorm.ErrDuplicatedKey) {
 			return models.ErrDuplicateTransaction
 		}
 		return fmt.Errorf("failed to create transaction: %w", err)
@@ -78,157 +49,65 @@ func (r *transactionRepository) Create(ctx context.Context, tx *models.Transacti
 	return nil
 }
 
-// FindByID retrieves a transaction by its ID
+// FindByID retrieves a transaction by its ID.
 func (r *transactionRepository) FindByID(ctx context.Context, id uuid.UUID) (*models.Transaction, error) {
-	query := `
-		SELECT id, account_id, order_id, customer_id, type, amount_cents, currency,
-		       reference_id, status, expires_at, metadata, created_at
-		FROM transactions
-		WHERE id = $1
-	`
-
 	var tx models.Transaction
-	var metadataJSON []byte
-
-	err := r.exec.QueryRowContext(ctx, query, id).Scan(
-		&tx.ID,
-		&tx.AccountID,
-		&tx.OrderID,
-		&tx.CustomerID,
-		&tx.Type,
-		&tx.AmountCents,
-		&tx.Currency,
-		&tx.ReferenceID,
-		&tx.Status,
-		&tx.ExpiresAt,
-		&metadataJSON,
-		&tx.CreatedAt,
-	)
-
-	if err == sql.ErrNoRows {
+	err := r.db.WithContext(ctx).First(&tx, "id = ?", id).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, fmt.Errorf("transaction not found: %w", err)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to find transaction: %w", err)
 	}
 
-	if metadataJSON != nil {
-		if err := json.Unmarshal(metadataJSON, &tx.Metadata); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal metadata: %w", err)
-		}
-	}
-
 	return &tx, nil
 }
 
-// FindByIDForUpdate retrieves a transaction by ID with a row lock (SELECT FOR UPDATE)
-// This must be called within a transaction to prevent race conditions
+// FindByIDForUpdate retrieves a transaction by ID with a row-level lock.
+// It must be called inside a transaction so the lock is held until commit/rollback.
 func (r *transactionRepository) FindByIDForUpdate(ctx context.Context, id uuid.UUID) (*models.Transaction, error) {
-	query := `
-		SELECT id, account_id, order_id, customer_id, type, amount_cents, currency,
-		       reference_id, status, expires_at, metadata, created_at
-		FROM transactions
-		WHERE id = $1
-		FOR UPDATE
-	`
-
 	var tx models.Transaction
-	var metadataJSON []byte
-
-	err := r.exec.QueryRowContext(ctx, query, id).Scan(
-		&tx.ID,
-		&tx.AccountID,
-		&tx.OrderID,
-		&tx.CustomerID,
-		&tx.Type,
-		&tx.AmountCents,
-		&tx.Currency,
-		&tx.ReferenceID,
-		&tx.Status,
-		&tx.ExpiresAt,
-		&metadataJSON,
-		&tx.CreatedAt,
-	)
-
-	if err == sql.ErrNoRows {
+	err := r.db.WithContext(ctx).
+		Clauses(clause.Locking{Strength: clause.LockingStrengthUpdate}).
+		First(&tx, "id = ?", id).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, fmt.Errorf("transaction not found: %w", err)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to find transaction: %w", err)
 	}
 
-	if metadataJSON != nil {
-		if err := json.Unmarshal(metadataJSON, &tx.Metadata); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal metadata: %w", err)
-		}
-	}
-
 	return &tx, nil
 }
 
-// FindByReferenceID finds a transaction by its reference_id and type
-// This is used to check if a capture/void/refund already exists for an authorization/capture
+// FindByReferenceID finds a transaction by its reference_id and type.
+// This is used to check if a capture/void/refund already exists for an
+// authorization/capture. A missing row returns (nil, nil).
 func (r *transactionRepository) FindByReferenceID(ctx context.Context, refID uuid.UUID, txnType models.TransactionType) (*models.Transaction, error) {
-	query := `
-		SELECT id, account_id, order_id, customer_id, type, amount_cents, currency,
-		       reference_id, status, expires_at, metadata, created_at
-		FROM transactions
-		WHERE reference_id = $1 AND type = $2
-		LIMIT 1
-	`
-
 	var tx models.Transaction
-	var metadataJSON []byte
-
-	err := r.exec.QueryRowContext(ctx, query, refID, txnType).Scan(
-		&tx.ID,
-		&tx.AccountID,
-		&tx.OrderID,
-		&tx.CustomerID,
-		&tx.Type,
-		&tx.AmountCents,
-		&tx.Currency,
-		&tx.ReferenceID,
-		&tx.Status,
-		&tx.ExpiresAt,
-		&metadataJSON,
-		&tx.CreatedAt,
-	)
-
-	if err == sql.ErrNoRows {
-		return nil, nil // Not found is not an error for this use case
+	err := r.db.WithContext(ctx).
+		Where("reference_id = ? AND type = ?", refID, txnType).
+		First(&tx).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
 	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to find transaction by reference: %w", err)
 	}
 
-	if metadataJSON != nil {
-		if err := json.Unmarshal(metadataJSON, &tx.Metadata); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal metadata: %w", err)
-		}
-	}
-
 	return &tx, nil
 }
 
-// UpdateStatus updates the status of a transaction
+// UpdateStatus updates the status of a transaction.
 func (r *transactionRepository) UpdateStatus(ctx context.Context, id uuid.UUID, status models.TransactionStatus) error {
-	query := `
-		UPDATE transactions
-		SET status = $2
-		WHERE id = $1
-	`
-
-	result, err := r.exec.ExecContext(ctx, query, id, status)
-	if err != nil {
-		return fmt.Errorf("failed to update transaction status: %w", err)
+	result := r.db.WithContext(ctx).
+		Model(&models.Transaction{}).
+		Where("id = ?", id).
+		Update("status", status)
+	if result.Error != nil {
+		return fmt.Errorf("failed to update transaction status: %w", result.Error)
 	}
-
-	rowsAffected, err := result.RowsAffected()
-	if err != nil {
-		return fmt.Errorf("failed to get rows affected: %w", err)
-	}
-	if rowsAffected == 0 {
+	if result.RowsAffected == 0 {
 		return fmt.Errorf("transaction not found")
 	}
 

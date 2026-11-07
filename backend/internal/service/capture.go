@@ -7,10 +7,11 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/tusharui/payment-gateway/backend/internal/db"
 	"github.com/tusharui/payment-gateway/backend/internal/models"
 	"github.com/tusharui/payment-gateway/backend/internal/repository"
-	"github.com/google/uuid"
+	"gorm.io/gorm"
 )
 
 // CaptureService handles payment capture operations
@@ -27,30 +28,21 @@ func NewCaptureService(database *db.DB) *CaptureService {
 
 // Capture captures an authorized payment
 func (s *CaptureService) Capture(ctx context.Context, authorizationID uuid.UUID, amount int64) (*models.Transaction, error) {
-	tx, err := s.db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelReadCommitted})
-	if err != nil {
-		return nil, &ServiceError{
-			Code:    ErrCodeInternalError,
-			Message: fmt.Sprintf("failed to start transaction: %v", err),
+	var captureTxn *models.Transaction
+	err := s.db.GORM().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		transactionRepo := repository.NewTransactionRepository(tx)
+		accountRepo := repository.NewAccountRepository(tx)
+
+		result, err := s.performCapture(ctx, transactionRepo, accountRepo, authorizationID, amount)
+		if err != nil {
+			return err
 		}
-	}
-	defer func() {
-		_ = tx.Rollback() //nolint:errcheck // rollback error is not critical in defer
-	}()
 
-	txTransactionRepo := repository.NewTransactionRepository(tx)
-	txAccountRepo := repository.NewAccountRepository(tx)
-
-	captureTxn, err := s.performCapture(ctx, txTransactionRepo, txAccountRepo, authorizationID, amount)
+		captureTxn = result
+		return nil
+	}, &sql.TxOptions{Isolation: sql.LevelReadCommitted})
 	if err != nil {
 		return nil, err
-	}
-
-	if err := tx.Commit(); err != nil {
-		return nil, &ServiceError{
-			Code:    ErrCodeInternalError,
-			Message: fmt.Sprintf("failed to commit transaction: %v", err),
-		}
 	}
 
 	return captureTxn, nil
@@ -136,7 +128,7 @@ func (s *CaptureService) performCapture(
 
 // GetCapture retrieves a capture by ID
 func (s *CaptureService) GetCapture(ctx context.Context, captureID uuid.UUID) (*models.Transaction, error) {
-	repo := repository.NewTransactionRepository(s.db)
+	repo := repository.NewTransactionRepository(s.db.GORM())
 	txn, err := repo.FindByID(ctx, captureID)
 	if err != nil || txn.Type != models.TransactionTypeCapture {
 		return nil, &ServiceError{

@@ -29,25 +29,25 @@ const (
 
 // Transaction represents a ledger entry for account activity
 type Transaction struct {
-	CreatedAt   time.Time         `db:"created_at"`
-	Metadata    map[string]any    `db:"metadata"`
-	ReferenceID *uuid.UUID        `db:"reference_id"`
-	ExpiresAt   *time.Time        `db:"expires_at"`
-	Currency    string            `db:"currency"`
-	Type        TransactionType   `db:"type"`
-	Status      TransactionStatus `db:"status"`
-	AmountCents int64             `db:"amount_cents"`
-	ID          uuid.UUID         `db:"id"`
-	AccountID   uuid.UUID         `db:"account_id"`
-	OrderID     *uuid.UUID        `db:"order_id"`
-	CustomerID  *uuid.UUID        `db:"customer_id"`
+	ID          uuid.UUID         `db:"id" gorm:"column:id;primaryKey"`
+	AccountID   uuid.UUID         `db:"account_id" gorm:"column:account_id"`
+	OrderID     *uuid.UUID        `db:"order_id" gorm:"column:order_id"`
+	CustomerID  *uuid.UUID        `db:"customer_id" gorm:"column:customer_id"`
+	Type        TransactionType   `db:"type" gorm:"column:type"`
+	AmountCents int64             `db:"amount_cents" gorm:"column:amount_cents"`
+	Currency    string            `db:"currency" gorm:"column:currency"`
+	ReferenceID *uuid.UUID        `db:"reference_id" gorm:"column:reference_id"`
+	Status      TransactionStatus `db:"status" gorm:"column:status"`
+	ExpiresAt   *time.Time        `db:"expires_at" gorm:"column:expires_at"`
+	Metadata    map[string]any    `db:"metadata" gorm:"column:metadata;serializer:json"`
+	CreatedAt   time.Time         `db:"created_at" gorm:"column:created_at"`
 }
 
 // IdempotencyKey tracks processed requests to prevent duplicate transactions
 type IdempotencyKey struct {
-	CreatedAt      time.Time `db:"created_at"`
-	Key            string    `db:"key"`
-	RequestPath    string    `db:"request_path"`
-	ResponseBody   string    `db:"response_body"`
-	ResponseStatus int       `db:"response_status"`
+	Key            string    `db:"key" gorm:"column:key"`
+	RequestPath    string    `db:"request_path" gorm:"column:request_path"`
+	ResponseBody   string    `db:"response_body" gorm:"column:response_body"`
+	ResponseStatus int       `db:"response_status" gorm:"column:response_status"`
+	CreatedAt      time.Time `db:"created_at" gorm:"column:created_at"`
 }

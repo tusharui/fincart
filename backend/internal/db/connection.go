@@ -6,32 +6,34 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"log"
 	"log/slog"
+	"os"
+	"time"
 
-	"github.com/tusharui/payment-gateway/backend/internal/config"
 	"github.com/lib/pq"
+	"github.com/tusharui/payment-gateway/backend/internal/config"
+	gormpostgres "gorm.io/driver/postgres"
+	"gorm.io/gorm"
+	gormlogger "gorm.io/gorm/logger"
 )
 
-// Executor defines the interface for executing database queries
-type Executor interface {
-	ExecContext(ctx context.Context, query string, args ...interface{}) (sql.Result, error)
-	QueryContext(ctx context.Context, query string, args ...interface{}) (*sql.Rows, error)
-	QueryRowContext(ctx context.Context, query string, args ...interface{}) *sql.Row
-}
-
-// DB wraps the database connection pool
+// DB owns the database connection pool and exposes both the native *sql.DB
+// (used for migrations and operational tasks) and a GORM handle used by the
+// repository layer.
 type DB struct {
 	*sql.DB
+	gorm   *gorm.DB
 	logger *slog.Logger
 }
 
-// Tx wraps a database transaction
-type Tx struct {
-	*sql.Tx
-	logger *slog.Logger
+// GORM returns the GORM handle used for ORM-based data access.
+func (db *DB) GORM() *gorm.DB {
+	return db.gorm
 }
 
-// Connect establishes a connection to the database
+// Connect establishes a connection to the database and initializes GORM on top
+// of the same connection pool.
 func Connect(ctx context.Context, cfg *config.DatabaseConfig, logger *slog.Logger) (*DB, error) {
 	logger.Info("connecting to database",
 		"host", cfg.Host,
@@ -39,19 +41,27 @@ func Connect(ctx context.Context, cfg *config.DatabaseConfig, logger *slog.Logge
 		"database", cfg.DBName,
 	)
 
-	db, err := sql.Open("postgres", cfg.DSN())
+	sqlDB, err := sql.Open("postgres", cfg.DSN())
 	if err != nil {
 		logger.Error("failed to open database connection", "error", err)
 		return nil, fmt.Errorf("failed to open database connection: %w", err)
 	}
 
-	db.SetMaxOpenConns(cfg.MaxOpenConns)
-	db.SetMaxIdleConns(cfg.MaxIdleConns)
-	db.SetConnMaxLifetime(cfg.ConnMaxLifetime)
+	sqlDB.SetMaxOpenConns(cfg.MaxOpenConns)
+	sqlDB.SetMaxIdleConns(cfg.MaxIdleConns)
+	sqlDB.SetConnMaxLifetime(cfg.ConnMaxLifetime)
 
-	if err := db.PingContext(ctx); err != nil {
+	if err := sqlDB.PingContext(ctx); err != nil {
 		logger.Error("failed to ping database", "error", err)
+		_ = sqlDB.Close()
 		return nil, fmt.Errorf("failed to ping database: %w", err)
+	}
+
+	gormDB, err := openGORM(sqlDB)
+	if err != nil {
+		logger.Error("failed to initialize orm", "error", err)
+		_ = sqlDB.Close()
+		return nil, fmt.Errorf("failed to initialize orm: %w", err)
 	}
 
 	logger.Info("successfully connected to database",
@@ -61,56 +71,30 @@ func Connect(ctx context.Context, cfg *config.DatabaseConfig, logger *slog.Logge
 	)
 
 	return &DB{
-		DB:     db,
+		DB:     sqlDB,
+		gorm:   gormDB,
 		logger: logger,
 	}, nil
+}
+
+// openGORM builds a GORM handle over an existing database/sql pool.
+// Reusing the pool keeps a single set of connection limits and drivers.
+func openGORM(sqlDB *sql.DB) (*gorm.DB, error) {
+	return gorm.Open(gormpostgres.New(gormpostgres.Config{Conn: sqlDB}), &gorm.Config{
+		SkipDefaultTransaction: true,
+		Logger: gormlogger.New(log.New(os.Stdout, "", log.LstdFlags), gormlogger.Config{
+			SlowThreshold:             200 * time.Millisecond,
+			LogLevel:                  gormlogger.Warn,
+			IgnoreRecordNotFoundError: true,
+			Colorful:                  false,
+		}),
+	})
 }
 
 // Close closes the database connection and logs the closure.
 func (db *DB) Close() error {
 	db.logger.Info("closing database connection")
 	return db.DB.Close()
-}
-
-// BeginTx starts a new database transaction with the specified isolation level
-func (db *DB) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) {
-	tx, err := db.DB.BeginTx(ctx, opts)
-	if err != nil {
-		db.logger.Error("failed to begin transaction", "error", err)
-		return nil, fmt.Errorf("failed to begin transaction: %w", err)
-	}
-
-	db.logger.Debug("transaction started")
-	return &Tx{
-		Tx:     tx,
-		logger: db.logger,
-	}, nil
-}
-
-// Commit commits the transaction
-func (tx *Tx) Commit() error {
-	if err := tx.Tx.Commit(); err != nil {
-		tx.logger.Error("failed to commit transaction", "error", err)
-		return fmt.Errorf("failed to commit transaction: %w", err)
-	}
-
-	tx.logger.Debug("transaction committed")
-	return nil
-}
-
-// Rollback rolls back the transaction
-func (tx *Tx) Rollback() error {
-	if err := tx.Tx.Rollback(); err != nil {
-		if errors.Is(err, sql.ErrTxDone) {
-			tx.logger.Debug("transaction already closed, ignoring rollback")
-			return nil
-		}
-		tx.logger.Error("failed to rollback transaction", "error", err)
-		return fmt.Errorf("failed to rollback transaction: %w", err)
-	}
-
-	tx.logger.Debug("transaction rolled back")
-	return nil
 }
 
 // IsUniqueViolation checks if the error is a PostgreSQL unique constraint violation

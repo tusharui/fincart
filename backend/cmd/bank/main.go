@@ -13,6 +13,7 @@ import (
 	"github.com/tusharui/payment-gateway/backend/internal/config"
 	"github.com/tusharui/payment-gateway/backend/internal/db"
 	"github.com/tusharui/payment-gateway/backend/internal/handlers"
+	"github.com/tusharui/payment-gateway/backend/internal/repository"
 )
 
 func main() {
@@ -84,15 +85,10 @@ func main() {
 // cleanupIdempotencyKeys removes idempotency keys older than 24 hours
 func cleanupIdempotencyKeys(ctx context.Context, database *db.DB, logger *slog.Logger) {
 	cutoffTime := time.Now().Add(-24 * time.Hour)
-	result, err := database.ExecContext(ctx, "DELETE FROM idempotency_keys WHERE created_at < $1", cutoffTime)
+	repo := repository.NewIdempotencyRepository(database.GORM())
+	rowsDeleted, err := repo.DeleteOlderThan(ctx, cutoffTime)
 	if err != nil {
 		logger.Warn("failed to cleanup old idempotency keys", "error", err)
-		return
-	}
-
-	rowsDeleted, err := result.RowsAffected()
-	if err != nil {
-		logger.Warn("failed to get rows affected", "error", err)
 		return
 	}
 	if rowsDeleted > 0 {

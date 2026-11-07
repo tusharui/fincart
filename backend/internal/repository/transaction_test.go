@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/tusharui/payment-gateway/backend/internal/models"
+	"github.com/tusharui/payment-gateway/backend/internal/security"
 )
 
 func TestTransactionRepository_Create(t *testing.T) {
@@ -16,10 +17,10 @@ func TestTransactionRepository_Create(t *testing.T) {
 	defer cleanupTestDB(t, database)
 	truncateTables(t, database)
 
-	repo := NewTransactionRepository(database)
-	accountRepo := NewAccountRepository(database)
+	repo := NewTransactionRepository(database.GORM())
+	accountRepo := NewAccountRepository(database.GORM())
 
-	account, err := accountRepo.FindByCardToken(context.Background(), "4111111111111111")
+	account, err := accountRepo.FindByCardToken(context.Background(), security.HashToken("4111111111111111"))
 	require.NoError(t, err, "failed to get account")
 
 	tests := []struct {
@@ -105,10 +106,10 @@ func TestTransactionRepository_FindByID(t *testing.T) {
 	defer cleanupTestDB(t, database)
 	truncateTables(t, database)
 
-	repo := NewTransactionRepository(database)
-	accountRepo := NewAccountRepository(database)
+	repo := NewTransactionRepository(database.GORM())
+	accountRepo := NewAccountRepository(database.GORM())
 
-	account, err := accountRepo.FindByCardToken(context.Background(), "4111111111111111")
+	account, err := accountRepo.FindByCardToken(context.Background(), security.HashToken("4111111111111111"))
 	require.NoError(t, err, "failed to get account")
 
 	tx := &models.Transaction{
@@ -158,10 +159,10 @@ func TestTransactionRepository_FindByReferenceID(t *testing.T) {
 	defer cleanupTestDB(t, database)
 	truncateTables(t, database)
 
-	repo := NewTransactionRepository(database)
-	accountRepo := NewAccountRepository(database)
+	repo := NewTransactionRepository(database.GORM())
+	accountRepo := NewAccountRepository(database.GORM())
 
-	account, err := accountRepo.FindByCardToken(context.Background(), "4111111111111111")
+	account, err := accountRepo.FindByCardToken(context.Background(), security.HashToken("4111111111111111"))
 	require.NoError(t, err, "failed to get account")
 
 	authTx := &models.Transaction{
@@ -233,10 +234,10 @@ func TestTransactionRepository_UpdateStatus(t *testing.T) {
 	defer cleanupTestDB(t, database)
 	truncateTables(t, database)
 
-	repo := NewTransactionRepository(database)
-	accountRepo := NewAccountRepository(database)
+	repo := NewTransactionRepository(database.GORM())
+	accountRepo := NewAccountRepository(database.GORM())
 
-	account, err := accountRepo.FindByCardToken(context.Background(), "4111111111111111")
+	account, err := accountRepo.FindByCardToken(context.Background(), security.HashToken("4111111111111111"))
 	require.NoError(t, err, "failed to get account")
 
 	tx := &models.Transaction{

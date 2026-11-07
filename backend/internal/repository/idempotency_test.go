@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/tusharui/payment-gateway/backend/internal/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/tusharui/payment-gateway/backend/internal/models"
 )
 
 func TestIdempotencyRepository_Store_And_Get(t *testing.T) {
@@ -15,7 +15,7 @@ func TestIdempotencyRepository_Store_And_Get(t *testing.T) {
 	defer cleanupTestDB(t, database)
 	truncateTables(t, database)
 
-	repo := NewIdempotencyRepository(database)
+	repo := NewIdempotencyRepository(database.GORM())
 
 	tests := []struct {
 		name        string
@@ -69,7 +69,7 @@ func TestIdempotencyRepository_Get_NotFound(t *testing.T) {
 	defer cleanupTestDB(t, database)
 	truncateTables(t, database)
 
-	repo := NewIdempotencyRepository(database)
+	repo := NewIdempotencyRepository(database.GORM())
 
 	result, err := repo.Get(context.Background(), "non-existent-key", "/api/v1/test")
 	require.NoError(t, err, "unexpected error")
@@ -81,7 +81,7 @@ func TestIdempotencyRepository_Store_OnConflict(t *testing.T) {
 	defer cleanupTestDB(t, database)
 	truncateTables(t, database)
 
-	repo := NewIdempotencyRepository(database)
+	repo := NewIdempotencyRepository(database.GORM())
 
 	key := "duplicate-key"
 	path := "/api/v1/authorizations"
@@ -117,7 +117,7 @@ func TestIdempotencyRepository_SameKey_DifferentPath(t *testing.T) {
 	defer cleanupTestDB(t, database)
 	truncateTables(t, database)
 
-	repo := NewIdempotencyRepository(database)
+	repo := NewIdempotencyRepository(database.GORM())
 
 	key := "same-key"
 
@@ -153,7 +153,7 @@ func TestIdempotencyRepository_DeleteOlderThan(t *testing.T) {
 	defer cleanupTestDB(t, database)
 	truncateTables(t, database)
 
-	repo := NewIdempotencyRepository(database)
+	repo := NewIdempotencyRepository(database.GORM())
 
 	now := time.Now()
 	yesterday := now.Add(-24 * time.Hour)
@@ -197,7 +197,7 @@ func TestIdempotencyRepository_DeleteOlderThan_NoneDeleted(t *testing.T) {
 	database := setupTestDB(t)
 	defer cleanupTestDB(t, database)
 
-	repo := NewIdempotencyRepository(database)
+	repo := NewIdempotencyRepository(database.GORM())
 
 	_, err := database.ExecContext(context.Background(), "DELETE FROM idempotency_keys")
 	require.NoError(t, err, "failed to clean idempotency keys")

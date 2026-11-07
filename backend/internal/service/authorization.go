@@ -11,6 +11,7 @@ import (
 	"github.com/tusharui/payment-gateway/backend/internal/models"
 	"github.com/tusharui/payment-gateway/backend/internal/repository"
 	"github.com/tusharui/payment-gateway/backend/internal/security"
+	"gorm.io/gorm"
 )
 
 // AuthorizationService handles payment authorization operations
@@ -36,30 +37,21 @@ func (s *AuthorizationService) Authorize(ctx context.Context, cardNumber, cvv st
 		return nil, err
 	}
 
-	tx, err := s.db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelReadCommitted})
-	if err != nil {
-		return nil, &ServiceError{
-			Code:    ErrCodeInternalError,
-			Message: fmt.Sprintf("failed to start transaction: %v", err),
+	var authTx *models.Transaction
+	err := s.db.GORM().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		accountRepo := repository.NewAccountRepository(tx)
+		transactionRepo := repository.NewTransactionRepository(tx)
+
+		result, err := s.performAuthorization(ctx, accountRepo, transactionRepo, cardNumber, cvv, amount)
+		if err != nil {
+			return err
 		}
-	}
-	defer func() {
-		_ = tx.Rollback() //nolint:errcheck // rollback error is not critical in defer
-	}()
 
-	txAccountRepo := repository.NewAccountRepository(tx)
-	txTransactionRepo := repository.NewTransactionRepository(tx)
-
-	authTx, err := s.performAuthorization(ctx, txAccountRepo, txTransactionRepo, cardNumber, cvv, amount)
+		authTx = result
+		return nil
+	}, &sql.TxOptions{Isolation: sql.LevelReadCommitted})
 	if err != nil {
 		return nil, err
-	}
-
-	if err := tx.Commit(); err != nil {
-		return nil, &ServiceError{
-			Code:    ErrCodeInternalError,
-			Message: fmt.Sprintf("failed to commit transaction: %v", err),
-		}
 	}
 
 	return authTx, nil
@@ -137,7 +129,7 @@ func (s *AuthorizationService) performAuthorization(
 
 // GetAuthorization retrieves an authorization by ID
 func (s *AuthorizationService) GetAuthorization(ctx context.Context, authID uuid.UUID) (*models.Transaction, error) {
-	repo := repository.NewTransactionRepository(s.db)
+	repo := repository.NewTransactionRepository(s.db.GORM())
 	txn, err := repo.FindByID(ctx, authID)
 	if err != nil || txn.Type != models.TransactionTypeAuthHold {
 		return nil, &ServiceError{

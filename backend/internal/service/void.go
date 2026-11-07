@@ -7,10 +7,11 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/tusharui/payment-gateway/backend/internal/db"
 	"github.com/tusharui/payment-gateway/backend/internal/models"
 	"github.com/tusharui/payment-gateway/backend/internal/repository"
-	"github.com/google/uuid"
+	"gorm.io/gorm"
 )
 
 // VoidService handles authorization void operations
@@ -27,30 +28,21 @@ func NewVoidService(database *db.DB) *VoidService {
 
 // Void cancels an authorization before it's captured
 func (s *VoidService) Void(ctx context.Context, authorizationID uuid.UUID) (*models.Transaction, error) {
-	tx, err := s.db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelReadCommitted})
-	if err != nil {
-		return nil, &ServiceError{
-			Code:    ErrCodeInternalError,
-			Message: fmt.Sprintf("failed to start transaction: %v", err),
+	var voidTxn *models.Transaction
+	err := s.db.GORM().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		transactionRepo := repository.NewTransactionRepository(tx)
+		accountRepo := repository.NewAccountRepository(tx)
+
+		result, err := s.performVoid(ctx, transactionRepo, accountRepo, authorizationID)
+		if err != nil {
+			return err
 		}
-	}
-	defer func() {
-		_ = tx.Rollback() //nolint:errcheck // rollback error is not critical in defer
-	}()
 
-	txTransactionRepo := repository.NewTransactionRepository(tx)
-	txAccountRepo := repository.NewAccountRepository(tx)
-
-	voidTxn, err := s.performVoid(ctx, txTransactionRepo, txAccountRepo, authorizationID)
+		voidTxn = result
+		return nil
+	}, &sql.TxOptions{Isolation: sql.LevelReadCommitted})
 	if err != nil {
 		return nil, err
-	}
-
-	if err := tx.Commit(); err != nil {
-		return nil, &ServiceError{
-			Code:    ErrCodeInternalError,
-			Message: fmt.Sprintf("failed to commit transaction: %v", err),
-		}
 	}
 
 	return voidTxn, nil
