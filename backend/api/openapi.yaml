@@ -115,6 +115,10 @@ paths:
                 $ref: '#/components/schemas/CaptureResponse'
         '400':
           $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
         '500':
           $ref: '#/components/responses/InternalError'
 
@@ -158,6 +162,10 @@ paths:
                 $ref: '#/components/schemas/VoidResponse'
         '400':
           $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
         '500':
           $ref: '#/components/responses/InternalError'
 
@@ -184,6 +192,10 @@ paths:
                 $ref: '#/components/schemas/RefundResponse'
         '400':
           $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
         '500':
           $ref: '#/components/responses/InternalError'
 
@@ -288,6 +300,7 @@ components:
         - already_refunded
         - amount_mismatch
         - capture_not_found
+        - capture_not_completed
         - refund_not_found
         - not_found
         - internal_error
@@ -488,6 +501,12 @@ components:
             $ref: '#/components/schemas/ErrorResponse'
     NotFound:
       description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Conflict:
+      description: Resource is in a state that conflicts with the request
       content:
         application/json:
           schema:

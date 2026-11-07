@@ -451,6 +451,8 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 
 type BadRequestJSONResponse ErrorResponse
 
+type ConflictJSONResponse ErrorResponse
+
 type InternalErrorJSONResponse ErrorResponse
 
 type NotFoundJSONResponse ErrorResponse
@@ -555,6 +557,24 @@ func (response CreateCapture400JSONResponse) VisitCreateCaptureResponse(w http.R
 	return json.NewEncoder(w).Encode(response)
 }
 
+type CreateCapture404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response CreateCapture404JSONResponse) VisitCreateCaptureResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CreateCapture409JSONResponse struct{ ConflictJSONResponse }
+
+func (response CreateCapture409JSONResponse) VisitCreateCaptureResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
 type CreateCapture500JSONResponse struct{ InternalErrorJSONResponse }
 
 func (response CreateCapture500JSONResponse) VisitCreateCaptureResponse(w http.ResponseWriter) error {
@@ -617,6 +637,24 @@ func (response CreateRefund400JSONResponse) VisitCreateRefundResponse(w http.Res
 	return json.NewEncoder(w).Encode(response)
 }
 
+type CreateRefund404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response CreateRefund404JSONResponse) VisitCreateRefundResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CreateRefund409JSONResponse struct{ ConflictJSONResponse }
+
+func (response CreateRefund409JSONResponse) VisitCreateRefundResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
 type CreateRefund500JSONResponse struct{ InternalErrorJSONResponse }
 
 func (response CreateRefund500JSONResponse) VisitCreateRefundResponse(w http.ResponseWriter) error {
@@ -675,6 +713,24 @@ type CreateVoid400JSONResponse struct{ BadRequestJSONResponse }
 func (response CreateVoid400JSONResponse) VisitCreateVoidResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CreateVoid404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response CreateVoid404JSONResponse) VisitCreateVoidResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CreateVoid409JSONResponse struct{ ConflictJSONResponse }
+
+func (response CreateVoid409JSONResponse) VisitCreateVoidResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
 
 	return json.NewEncoder(w).Encode(response)
 }

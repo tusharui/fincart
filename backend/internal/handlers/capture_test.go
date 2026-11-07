@@ -5,14 +5,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/tusharui/payment-gateway/backend/internal/api"
-	"github.com/tusharui/payment-gateway/backend/internal/models"
-	"github.com/tusharui/payment-gateway/backend/internal/service"
-	"github.com/tusharui/payment-gateway/backend/internal/service/mocks"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"github.com/tusharui/payment-gateway/backend/internal/api"
+	"github.com/tusharui/payment-gateway/backend/internal/models"
+	"github.com/tusharui/payment-gateway/backend/internal/service"
+	"github.com/tusharui/payment-gateway/backend/internal/service/mocks"
 )
 
 func TestCreateCapture_Success(t *testing.T) {
@@ -48,13 +48,16 @@ func TestCreateCapture_Success(t *testing.T) {
 
 func TestCreateCapture_ServiceErrors(t *testing.T) {
 	tests := []struct {
-		name         string
-		serviceErr   *service.ServiceError
-		expectedCode api.ErrorCode
+		name           string
+		serviceErr     *service.ServiceError
+		expectedCode   api.ErrorCode
+		expectedStatus int
 	}{
-		{"auth not found", &service.ServiceError{Code: service.ErrCodeAuthNotFound}, api.ErrorCodeAuthorizationNotFound},
-		{"auth expired", &service.ServiceError{Code: service.ErrCodeAuthExpired}, api.ErrorCodeAuthorizationExpired},
-		{"already captured", &service.ServiceError{Code: service.ErrCodeAlreadyCaptured}, api.ErrorCodeAlreadyCaptured},
+		{"auth not found", &service.ServiceError{Code: service.ErrCodeAuthNotFound}, api.ErrorCodeAuthorizationNotFound, 404},
+		{"auth expired", &service.ServiceError{Code: service.ErrCodeAuthExpired}, api.ErrorCodeAuthorizationExpired, 409},
+		{"already captured", &service.ServiceError{Code: service.ErrCodeAlreadyCaptured}, api.ErrorCodeAlreadyCaptured, 409},
+		{"amount mismatch", &service.ServiceError{Code: service.ErrCodeAmountMismatch}, api.ErrorCodeAmountMismatch, 400},
+		{"internal error", &service.ServiceError{Code: service.ErrCodeInternalError}, api.ErrorCodeInternalError, 500},
 	}
 
 	for _, tt := range tests {
@@ -75,9 +78,24 @@ func TestCreateCapture_ServiceErrors(t *testing.T) {
 			resp, err := handler.CreateCapture(context.Background(), req)
 			require.NoError(t, err)
 
-			badResp, ok := resp.(api.CreateCapture400JSONResponse)
-			require.True(t, ok)
-			assert.Equal(t, tt.expectedCode, badResp.Error)
+			switch tt.expectedStatus {
+			case 404:
+				typed, ok := resp.(api.CreateCapture404JSONResponse)
+				require.True(t, ok, "expected 404 response, got %T", resp)
+				assert.Equal(t, tt.expectedCode, typed.Error)
+			case 409:
+				typed, ok := resp.(api.CreateCapture409JSONResponse)
+				require.True(t, ok, "expected 409 response, got %T", resp)
+				assert.Equal(t, tt.expectedCode, typed.Error)
+			case 500:
+				typed, ok := resp.(api.CreateCapture500JSONResponse)
+				require.True(t, ok, "expected 500 response, got %T", resp)
+				assert.Equal(t, tt.expectedCode, typed.Error)
+			default:
+				typed, ok := resp.(api.CreateCapture400JSONResponse)
+				require.True(t, ok, "expected 400 response, got %T", resp)
+				assert.Equal(t, tt.expectedCode, typed.Error)
+			}
 		})
 	}
 }

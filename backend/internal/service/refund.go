@@ -66,7 +66,7 @@ func (s *RefundService) performRefund(
 
 	if captureTxn.Status != models.TransactionStatusCompleted {
 		return nil, &ServiceError{
-			Code:    ErrCodeCaptureNotFound,
+			Code:    ErrCodeCaptureNotCompleted,
 			Message: "capture is not in completed status",
 		}
 	}
@@ -119,7 +119,7 @@ func (s *RefundService) GetRefund(ctx context.Context, refundID uuid.UUID) (*mod
 	txn, err := repo.FindByID(ctx, refundID)
 	if err != nil || txn.Type != models.TransactionTypeRefund {
 		return nil, &ServiceError{
-			Code:    "refund_not_found",
+			Code:    ErrCodeRefundNotFound,
 			Message: "refund not found",
 		}
 	}

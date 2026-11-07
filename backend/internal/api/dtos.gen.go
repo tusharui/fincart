@@ -26,6 +26,7 @@ const (
 	ErrorCodeAuthorizationAlreadyUsed ErrorCode = "authorization_already_used"
 	ErrorCodeAuthorizationExpired     ErrorCode = "authorization_expired"
 	ErrorCodeAuthorizationNotFound    ErrorCode = "authorization_not_found"
+	ErrorCodeCaptureNotCompleted      ErrorCode = "capture_not_completed"
 	ErrorCodeCaptureNotFound          ErrorCode = "capture_not_found"
 	ErrorCodeCardExpired              ErrorCode = "card_expired"
 	ErrorCodeInsufficientFunds        ErrorCode = "insufficient_funds"
@@ -173,6 +174,9 @@ type RefundId = string
 
 // BadRequest defines model for BadRequest.
 type BadRequest = ErrorResponse
+
+// Conflict defines model for Conflict.
+type Conflict = ErrorResponse
 
 // InternalError defines model for InternalError.
 type InternalError = ErrorResponse

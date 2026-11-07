@@ -89,6 +89,31 @@ func (h *Handler) handleRefundError(err error) (api.CreateRefundResponseObject, 
 
 	errorCode := mapServiceErrorToCode(svcErr.Code)
 
+	switch {
+	case isNotFoundError(svcErr.Code):
+		return api.CreateRefund404JSONResponse{
+			NotFoundJSONResponse: api.NotFoundJSONResponse{
+				Error:   errorCode,
+				Message: svcErr.Message,
+			},
+		}, nil
+	case isConflictError(svcErr.Code):
+		return api.CreateRefund409JSONResponse{
+			ConflictJSONResponse: api.ConflictJSONResponse{
+				Error:   errorCode,
+				Message: svcErr.Message,
+			},
+		}, nil
+	case errorCode == api.ErrorCodeInternalError:
+		h.logger.Error("unexpected error during refund", "error", err)
+		return api.CreateRefund500JSONResponse{
+			InternalErrorJSONResponse: api.InternalErrorJSONResponse{
+				Error:   api.ErrorCodeInternalError,
+				Message: "internal error",
+			},
+		}, nil
+	}
+
 	return api.CreateRefund400JSONResponse{
 		BadRequestJSONResponse: api.BadRequestJSONResponse{
 			Error:   errorCode,

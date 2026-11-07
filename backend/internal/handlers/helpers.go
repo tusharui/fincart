@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/google/uuid"
 	"github.com/tusharui/payment-gateway/backend/internal/api"
 	"github.com/tusharui/payment-gateway/backend/internal/service"
-	"github.com/google/uuid"
 )
 
 // ID prefixes for API responses
@@ -88,6 +88,10 @@ func mapServiceErrorToCode(code string) api.ErrorCode {
 		return api.ErrorCodeAmountMismatch
 	case service.ErrCodeCaptureNotFound:
 		return api.ErrorCodeCaptureNotFound
+	case service.ErrCodeCaptureNotCompleted:
+		return api.ErrorCodeCaptureNotCompleted
+	case service.ErrCodeRefundNotFound:
+		return api.ErrorCodeRefundNotFound
 	default:
 		return api.ErrorCodeInternalError
 	}
@@ -95,6 +99,32 @@ func mapServiceErrorToCode(code string) api.ErrorCode {
 
 func isPaymentRequiredError(code string) bool {
 	return code == service.ErrCodeInsufficientFunds
+}
+
+// isNotFoundError reports whether the service error represents a missing resource (HTTP 404).
+func isNotFoundError(code string) bool {
+	switch code {
+	case service.ErrCodeAuthNotFound, service.ErrCodeCaptureNotFound,
+		service.ErrCodeRefundNotFound:
+		return true
+	default:
+		return false
+	}
+}
+
+// isConflictError reports whether the service error represents a state conflict (HTTP 409).
+func isConflictError(code string) bool {
+	switch code {
+	case service.ErrCodeAuthExpired,
+		service.ErrCodeAuthAlreadyUsed,
+		service.ErrCodeAlreadyCaptured,
+		service.ErrCodeAlreadyVoided,
+		service.ErrCodeAlreadyRefunded,
+		service.ErrCodeCaptureNotCompleted:
+		return true
+	default:
+		return false
+	}
 }
 
 func extractServiceError(err error) *service.ServiceError {

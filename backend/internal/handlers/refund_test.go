@@ -5,14 +5,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/tusharui/payment-gateway/backend/internal/api"
-	"github.com/tusharui/payment-gateway/backend/internal/models"
-	"github.com/tusharui/payment-gateway/backend/internal/service"
-	"github.com/tusharui/payment-gateway/backend/internal/service/mocks"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"github.com/tusharui/payment-gateway/backend/internal/api"
+	"github.com/tusharui/payment-gateway/backend/internal/models"
+	"github.com/tusharui/payment-gateway/backend/internal/service"
+	"github.com/tusharui/payment-gateway/backend/internal/service/mocks"
 )
 
 func TestCreateRefund_Success(t *testing.T) {
@@ -48,13 +48,16 @@ func TestCreateRefund_Success(t *testing.T) {
 
 func TestCreateRefund_ServiceErrors(t *testing.T) {
 	tests := []struct {
-		name         string
-		serviceErr   *service.ServiceError
-		expectedCode api.ErrorCode
+		name           string
+		serviceErr     *service.ServiceError
+		expectedCode   api.ErrorCode
+		expectedStatus int
 	}{
-		{"capture not found", &service.ServiceError{Code: service.ErrCodeCaptureNotFound}, api.ErrorCodeCaptureNotFound},
-		{"already refunded", &service.ServiceError{Code: service.ErrCodeAlreadyRefunded}, api.ErrorCodeAlreadyRefunded},
-		{"amount mismatch", &service.ServiceError{Code: service.ErrCodeAmountMismatch}, api.ErrorCodeAmountMismatch},
+		{"capture not found", &service.ServiceError{Code: service.ErrCodeCaptureNotFound}, api.ErrorCodeCaptureNotFound, 404},
+		{"capture not completed", &service.ServiceError{Code: service.ErrCodeCaptureNotCompleted}, api.ErrorCodeCaptureNotCompleted, 409},
+		{"already refunded", &service.ServiceError{Code: service.ErrCodeAlreadyRefunded}, api.ErrorCodeAlreadyRefunded, 409},
+		{"amount mismatch", &service.ServiceError{Code: service.ErrCodeAmountMismatch}, api.ErrorCodeAmountMismatch, 400},
+		{"internal error", &service.ServiceError{Code: service.ErrCodeInternalError}, api.ErrorCodeInternalError, 500},
 	}
 
 	for _, tt := range tests {
@@ -75,9 +78,24 @@ func TestCreateRefund_ServiceErrors(t *testing.T) {
 			resp, err := handler.CreateRefund(context.Background(), req)
 			require.NoError(t, err)
 
-			badResp, ok := resp.(api.CreateRefund400JSONResponse)
-			require.True(t, ok)
-			assert.Equal(t, tt.expectedCode, badResp.Error)
+			switch tt.expectedStatus {
+			case 404:
+				typed, ok := resp.(api.CreateRefund404JSONResponse)
+				require.True(t, ok, "expected 404 response, got %T", resp)
+				assert.Equal(t, tt.expectedCode, typed.Error)
+			case 409:
+				typed, ok := resp.(api.CreateRefund409JSONResponse)
+				require.True(t, ok, "expected 409 response, got %T", resp)
+				assert.Equal(t, tt.expectedCode, typed.Error)
+			case 500:
+				typed, ok := resp.(api.CreateRefund500JSONResponse)
+				require.True(t, ok, "expected 500 response, got %T", resp)
+				assert.Equal(t, tt.expectedCode, typed.Error)
+			default:
+				typed, ok := resp.(api.CreateRefund400JSONResponse)
+				require.True(t, ok, "expected 400 response, got %T", resp)
+				assert.Equal(t, tt.expectedCode, typed.Error)
+			}
 		})
 	}
 }

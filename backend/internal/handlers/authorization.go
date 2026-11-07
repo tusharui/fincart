@@ -101,6 +101,16 @@ func (h *Handler) handleAuthorizationError(
 		}, nil
 	}
 
+	if errorCode == api.ErrorCodeInternalError {
+		h.logger.Error("unexpected error during authorization", "error", err)
+		return api.CreateAuthorization500JSONResponse{
+			InternalErrorJSONResponse: api.InternalErrorJSONResponse{
+				Error:   api.ErrorCodeInternalError,
+				Message: "internal error",
+			},
+		}, nil
+	}
+
 	return api.CreateAuthorization400JSONResponse{
 		BadRequestJSONResponse: api.BadRequestJSONResponse{
 			Error:   errorCode,

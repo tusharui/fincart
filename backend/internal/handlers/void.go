@@ -49,6 +49,31 @@ func (h *Handler) handleVoidError(err error) (api.CreateVoidResponseObject, erro
 
 	errorCode := mapServiceErrorToCode(svcErr.Code)
 
+	switch {
+	case isNotFoundError(svcErr.Code):
+		return api.CreateVoid404JSONResponse{
+			NotFoundJSONResponse: api.NotFoundJSONResponse{
+				Error:   errorCode,
+				Message: svcErr.Message,
+			},
+		}, nil
+	case isConflictError(svcErr.Code):
+		return api.CreateVoid409JSONResponse{
+			ConflictJSONResponse: api.ConflictJSONResponse{
+				Error:   errorCode,
+				Message: svcErr.Message,
+			},
+		}, nil
+	case errorCode == api.ErrorCodeInternalError:
+		h.logger.Error("unexpected error during void", "error", err)
+		return api.CreateVoid500JSONResponse{
+			InternalErrorJSONResponse: api.InternalErrorJSONResponse{
+				Error:   api.ErrorCodeInternalError,
+				Message: "internal error",
+			},
+		}, nil
+	}
+
 	return api.CreateVoid400JSONResponse{
 		BadRequestJSONResponse: api.BadRequestJSONResponse{
 			Error:   errorCode,

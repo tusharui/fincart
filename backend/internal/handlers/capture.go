@@ -89,6 +89,31 @@ func (h *Handler) handleCaptureError(err error) (api.CreateCaptureResponseObject
 
 	errorCode := mapServiceErrorToCode(svcErr.Code)
 
+	switch {
+	case isNotFoundError(svcErr.Code):
+		return api.CreateCapture404JSONResponse{
+			NotFoundJSONResponse: api.NotFoundJSONResponse{
+				Error:   errorCode,
+				Message: svcErr.Message,
+			},
+		}, nil
+	case isConflictError(svcErr.Code):
+		return api.CreateCapture409JSONResponse{
+			ConflictJSONResponse: api.ConflictJSONResponse{
+				Error:   errorCode,
+				Message: svcErr.Message,
+			},
+		}, nil
+	case errorCode == api.ErrorCodeInternalError:
+		h.logger.Error("unexpected error during capture", "error", err)
+		return api.CreateCapture500JSONResponse{
+			InternalErrorJSONResponse: api.InternalErrorJSONResponse{
+				Error:   api.ErrorCodeInternalError,
+				Message: "internal error",
+			},
+		}, nil
+	}
+
 	return api.CreateCapture400JSONResponse{
 		BadRequestJSONResponse: api.BadRequestJSONResponse{
 			Error:   errorCode,

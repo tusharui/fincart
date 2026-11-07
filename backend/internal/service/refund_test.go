@@ -5,11 +5,11 @@ import (
 	"database/sql"
 	"testing"
 
-	"github.com/tusharui/payment-gateway/backend/internal/models"
-	"github.com/tusharui/payment-gateway/backend/internal/repository/mocks"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/tusharui/payment-gateway/backend/internal/models"
+	"github.com/tusharui/payment-gateway/backend/internal/repository/mocks"
 )
 
 func TestRefundService_PerformRefund(t *testing.T) {
@@ -134,7 +134,7 @@ func TestRefundService_PerformRefund(t *testing.T) {
 
 		var svcErr *ServiceError
 		if assert.ErrorAs(t, err, &svcErr) {
-			assert.Equal(t, ErrCodeCaptureNotFound, svcErr.Code)
+			assert.Equal(t, ErrCodeCaptureNotCompleted, svcErr.Code)
 		}
 
 		mockTxRepo.AssertExpectations(t)

@@ -168,7 +168,7 @@ func TestCapture_AuthorizationAlreadyUsed(t *testing.T) {
 	cap1.Body.Close()
 
 	cap2 := ts.Capture(t, authID, 10000, "double-cap-2")
-	require.Equal(t, http.StatusBadRequest, cap2.StatusCode)
+	require.Equal(t, http.StatusConflict, cap2.StatusCode)
 
 	var body map[string]any
 	require.NoError(t, json.NewDecoder(cap2.Body).Decode(&body))
@@ -194,7 +194,7 @@ func TestVoid_AfterCapture(t *testing.T) {
 	capResp.Body.Close()
 
 	voidResp := ts.Void(t, authID, "void-after-cap-void")
-	require.Equal(t, http.StatusBadRequest, voidResp.StatusCode)
+	require.Equal(t, http.StatusConflict, voidResp.StatusCode)
 
 	var body map[string]any
 	require.NoError(t, json.NewDecoder(voidResp.Body).Decode(&body))
