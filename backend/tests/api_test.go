@@ -115,11 +115,11 @@ func TestAuthorization_InvalidCard(t *testing.T) {
 	assert.Equal(t, "invalid_card", body["error"])
 }
 
-func TestAuthorization_InvalidCVV(t *testing.T) {
+func TestAuthorization_InvalidCVVFormat(t *testing.T) {
 	ts := SetupTest(t)
 	defer ts.Close()
 
-	resp := ts.Authorize(t, "4111111111111111", "999", 10000, "invalid-cvv-key")
+	resp := ts.Authorize(t, "4111111111111111", "12", 10000, "invalid-cvv-key")
 	require.Equal(t, http.StatusBadRequest, resp.StatusCode)
 
 	var body map[string]any

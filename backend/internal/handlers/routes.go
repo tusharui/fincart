@@ -31,7 +31,10 @@ func NewRouter(
 
 	mux := http.NewServeMux()
 	api.RegisterDocsRoutes(mux)
-	api.HandlerFromMux(strictHandler, mux)
+	api.HandlerWithOptions(strictHandler, api.StdHTTPServerOptions{
+		BaseRouter:       mux,
+		ErrorHandlerFunc: handler.requestErrorHandler,
+	})
 
 	var finalHandler http.Handler = mux
 

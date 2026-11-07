@@ -13,6 +13,7 @@ import (
 func TestAccountRepository_FindByCardToken(t *testing.T) {
 	database := setupTestDB(t)
 	defer cleanupTestDB(t, database)
+	truncateTables(t, database)
 
 	repo := NewAccountRepository(database.GORM())
 
@@ -58,6 +59,7 @@ func TestAccountRepository_FindByCardToken(t *testing.T) {
 func TestAccountRepository_FindByID(t *testing.T) {
 	database := setupTestDB(t)
 	defer cleanupTestDB(t, database)
+	truncateTables(t, database)
 
 	repo := NewAccountRepository(database.GORM())
 
@@ -99,6 +101,7 @@ func TestAccountRepository_FindByID(t *testing.T) {
 func TestAccountRepository_AdjustBalances(t *testing.T) {
 	database := setupTestDB(t)
 	defer cleanupTestDB(t, database)
+	truncateTables(t, database)
 
 	repo := NewAccountRepository(database.GORM())
 
