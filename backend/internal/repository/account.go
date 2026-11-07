@@ -6,16 +6,16 @@ import (
 	"database/sql"
 	"fmt"
 
+	"github.com/google/uuid"
 	"github.com/tusharui/payment-gateway/backend/internal/db"
 	"github.com/tusharui/payment-gateway/backend/internal/models"
-	"github.com/google/uuid"
 )
 
 // AccountRepository defines the interface for account data access
 type AccountRepository interface {
 	FindByID(ctx context.Context, id uuid.UUID) (*models.Account, error)
-	FindByAccountNumber(ctx context.Context, accountNumber string) (*models.Account, error)
-	FindByAccountNumberForUpdate(ctx context.Context, accountNumber string) (*models.Account, error)
+	FindByCardToken(ctx context.Context, cardToken string) (*models.Account, error)
+	FindByCardTokenForUpdate(ctx context.Context, cardToken string) (*models.Account, error)
 	AdjustBalances(ctx context.Context, accountID uuid.UUID, balanceDelta, availableBalanceDelta int64) error
 }
 
@@ -34,7 +34,7 @@ func NewAccountRepository(exec db.Executor) AccountRepository {
 // FindByID retrieves an account by its UUID
 func (r *accountRepository) FindByID(ctx context.Context, id uuid.UUID) (*models.Account, error) {
 	query := `
-		SELECT id, account_number, cvv, expiry_month, expiry_year,
+		SELECT id, card_token, last4, expiry_month, expiry_year,
 		       balance_cents, available_balance_cents, created_at, updated_at
 		FROM accounts
 		WHERE id = $1
@@ -43,8 +43,8 @@ func (r *accountRepository) FindByID(ctx context.Context, id uuid.UUID) (*models
 	var account models.Account
 	err := r.exec.QueryRowContext(ctx, query, id).Scan(
 		&account.ID,
-		&account.AccountNumber,
-		&account.CVV,
+		&account.CardToken,
+		&account.Last4,
 		&account.ExpiryMonth,
 		&account.ExpiryYear,
 		&account.BalanceCents,
@@ -63,20 +63,20 @@ func (r *accountRepository) FindByID(ctx context.Context, id uuid.UUID) (*models
 	return &account, nil
 }
 
-// FindByAccountNumber retrieves an account by its account number (card number)
-func (r *accountRepository) FindByAccountNumber(ctx context.Context, accountNumber string) (*models.Account, error) {
+// FindByCardToken retrieves an account by its card token
+func (r *accountRepository) FindByCardToken(ctx context.Context, cardToken string) (*models.Account, error) {
 	query := `
-		SELECT id, account_number, cvv, expiry_month, expiry_year,
+		SELECT id, card_token, last4, expiry_month, expiry_year,
 		       balance_cents, available_balance_cents, created_at, updated_at
 		FROM accounts
-		WHERE account_number = $1
+		WHERE card_token = $1
 	`
 
 	var account models.Account
-	err := r.exec.QueryRowContext(ctx, query, accountNumber).Scan(
+	err := r.exec.QueryRowContext(ctx, query, cardToken).Scan(
 		&account.ID,
-		&account.AccountNumber,
-		&account.CVV,
+		&account.CardToken,
+		&account.Last4,
 		&account.ExpiryMonth,
 		&account.ExpiryYear,
 		&account.BalanceCents,
@@ -89,27 +89,27 @@ func (r *accountRepository) FindByAccountNumber(ctx context.Context, accountNumb
 		return nil, fmt.Errorf("account not found: %w", err)
 	}
 	if err != nil {
-		return nil, fmt.Errorf("failed to find account by account number: %w", err)
+		return nil, fmt.Errorf("failed to find account by token: %w", err)
 	}
 
 	return &account, nil
 }
 
-// FindByAccountNumberForUpdate retrieves an account by its account number with row-level lock
-func (r *accountRepository) FindByAccountNumberForUpdate(ctx context.Context, accountNumber string) (*models.Account, error) {
+// FindByCardTokenForUpdate retrieves an account by its card token with row-level lock
+func (r *accountRepository) FindByCardTokenForUpdate(ctx context.Context, cardToken string) (*models.Account, error) {
 	query := `
-		SELECT id, account_number, cvv, expiry_month, expiry_year,
+		SELECT id, card_token, last4, expiry_month, expiry_year,
 		       balance_cents, available_balance_cents, created_at, updated_at
 		FROM accounts
-		WHERE account_number = $1
+		WHERE card_token = $1
 		FOR UPDATE
 	`
 
 	var account models.Account
-	err := r.exec.QueryRowContext(ctx, query, accountNumber).Scan(
+	err := r.exec.QueryRowContext(ctx, query, cardToken).Scan(
 		&account.ID,
-		&account.AccountNumber,
-		&account.CVV,
+		&account.CardToken,
+		&account.Last4,
 		&account.ExpiryMonth,
 		&account.ExpiryYear,
 		&account.BalanceCents,

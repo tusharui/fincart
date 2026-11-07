@@ -5,8 +5,8 @@ package mocks
 import (
 	context "context"
 
-	models "github.com/tusharui/payment-gateway/backend/internal/models"
 	mock "github.com/stretchr/testify/mock"
+	models "github.com/tusharui/payment-gateway/backend/internal/models"
 
 	uuid "github.com/google/uuid"
 )
@@ -73,21 +73,21 @@ func (_c *MockAccountRepository_AdjustBalances_Call) RunAndReturn(run func(conte
 	return _c
 }
 
-// FindByAccountNumber provides a mock function with given fields: ctx, accountNumber
-func (_m *MockAccountRepository) FindByAccountNumber(ctx context.Context, accountNumber string) (*models.Account, error) {
-	ret := _m.Called(ctx, accountNumber)
+// FindByCardToken provides a mock function with given fields: ctx, cardToken
+func (_m *MockAccountRepository) FindByCardToken(ctx context.Context, cardToken string) (*models.Account, error) {
+	ret := _m.Called(ctx, cardToken)
 
 	if len(ret) == 0 {
-		panic("no return value specified for FindByAccountNumber")
+		panic("no return value specified for FindByCardToken")
 	}
 
 	var r0 *models.Account
 	var r1 error
 	if rf, ok := ret.Get(0).(func(context.Context, string) (*models.Account, error)); ok {
-		return rf(ctx, accountNumber)
+		return rf(ctx, cardToken)
 	}
 	if rf, ok := ret.Get(0).(func(context.Context, string) *models.Account); ok {
-		r0 = rf(ctx, accountNumber)
+		r0 = rf(ctx, cardToken)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*models.Account)
@@ -95,7 +95,7 @@ func (_m *MockAccountRepository) FindByAccountNumber(ctx context.Context, accoun
 	}
 
 	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
-		r1 = rf(ctx, accountNumber)
+		r1 = rf(ctx, cardToken)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -103,50 +103,50 @@ func (_m *MockAccountRepository) FindByAccountNumber(ctx context.Context, accoun
 	return r0, r1
 }
 
-// MockAccountRepository_FindByAccountNumber_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'FindByAccountNumber'
-type MockAccountRepository_FindByAccountNumber_Call struct {
+// MockAccountRepository_FindByCardToken_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'FindByCardToken'
+type MockAccountRepository_FindByCardToken_Call struct {
 	*mock.Call
 }
 
-// FindByAccountNumber is a helper method to define mock.On call
+// FindByCardToken is a helper method to define mock.On call
 //   - ctx context.Context
-//   - accountNumber string
-func (_e *MockAccountRepository_Expecter) FindByAccountNumber(ctx interface{}, accountNumber interface{}) *MockAccountRepository_FindByAccountNumber_Call {
-	return &MockAccountRepository_FindByAccountNumber_Call{Call: _e.mock.On("FindByAccountNumber", ctx, accountNumber)}
+//   - cardToken string
+func (_e *MockAccountRepository_Expecter) FindByCardToken(ctx interface{}, cardToken interface{}) *MockAccountRepository_FindByCardToken_Call {
+	return &MockAccountRepository_FindByCardToken_Call{Call: _e.mock.On("FindByCardToken", ctx, cardToken)}
 }
 
-func (_c *MockAccountRepository_FindByAccountNumber_Call) Run(run func(ctx context.Context, accountNumber string)) *MockAccountRepository_FindByAccountNumber_Call {
+func (_c *MockAccountRepository_FindByCardToken_Call) Run(run func(ctx context.Context, cardToken string)) *MockAccountRepository_FindByCardToken_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		run(args[0].(context.Context), args[1].(string))
 	})
 	return _c
 }
 
-func (_c *MockAccountRepository_FindByAccountNumber_Call) Return(_a0 *models.Account, _a1 error) *MockAccountRepository_FindByAccountNumber_Call {
+func (_c *MockAccountRepository_FindByCardToken_Call) Return(_a0 *models.Account, _a1 error) *MockAccountRepository_FindByCardToken_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockAccountRepository_FindByAccountNumber_Call) RunAndReturn(run func(context.Context, string) (*models.Account, error)) *MockAccountRepository_FindByAccountNumber_Call {
+func (_c *MockAccountRepository_FindByCardToken_Call) RunAndReturn(run func(context.Context, string) (*models.Account, error)) *MockAccountRepository_FindByCardToken_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// FindByAccountNumberForUpdate provides a mock function with given fields: ctx, accountNumber
-func (_m *MockAccountRepository) FindByAccountNumberForUpdate(ctx context.Context, accountNumber string) (*models.Account, error) {
-	ret := _m.Called(ctx, accountNumber)
+// FindByCardTokenForUpdate provides a mock function with given fields: ctx, cardToken
+func (_m *MockAccountRepository) FindByCardTokenForUpdate(ctx context.Context, cardToken string) (*models.Account, error) {
+	ret := _m.Called(ctx, cardToken)
 
 	if len(ret) == 0 {
-		panic("no return value specified for FindByAccountNumberForUpdate")
+		panic("no return value specified for FindByCardTokenForUpdate")
 	}
 
 	var r0 *models.Account
 	var r1 error
 	if rf, ok := ret.Get(0).(func(context.Context, string) (*models.Account, error)); ok {
-		return rf(ctx, accountNumber)
+		return rf(ctx, cardToken)
 	}
 	if rf, ok := ret.Get(0).(func(context.Context, string) *models.Account); ok {
-		r0 = rf(ctx, accountNumber)
+		r0 = rf(ctx, cardToken)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*models.Account)
@@ -154,7 +154,7 @@ func (_m *MockAccountRepository) FindByAccountNumberForUpdate(ctx context.Contex
 	}
 
 	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
-		r1 = rf(ctx, accountNumber)
+		r1 = rf(ctx, cardToken)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -162,31 +162,31 @@ func (_m *MockAccountRepository) FindByAccountNumberForUpdate(ctx context.Contex
 	return r0, r1
 }
 
-// MockAccountRepository_FindByAccountNumberForUpdate_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'FindByAccountNumberForUpdate'
-type MockAccountRepository_FindByAccountNumberForUpdate_Call struct {
+// MockAccountRepository_FindByCardTokenForUpdate_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'FindByCardTokenForUpdate'
+type MockAccountRepository_FindByCardTokenForUpdate_Call struct {
 	*mock.Call
 }
 
-// FindByAccountNumberForUpdate is a helper method to define mock.On call
+// FindByCardTokenForUpdate is a helper method to define mock.On call
 //   - ctx context.Context
-//   - accountNumber string
-func (_e *MockAccountRepository_Expecter) FindByAccountNumberForUpdate(ctx interface{}, accountNumber interface{}) *MockAccountRepository_FindByAccountNumberForUpdate_Call {
-	return &MockAccountRepository_FindByAccountNumberForUpdate_Call{Call: _e.mock.On("FindByAccountNumberForUpdate", ctx, accountNumber)}
+//   - cardToken string
+func (_e *MockAccountRepository_Expecter) FindByCardTokenForUpdate(ctx interface{}, cardToken interface{}) *MockAccountRepository_FindByCardTokenForUpdate_Call {
+	return &MockAccountRepository_FindByCardTokenForUpdate_Call{Call: _e.mock.On("FindByCardTokenForUpdate", ctx, cardToken)}
 }
 
-func (_c *MockAccountRepository_FindByAccountNumberForUpdate_Call) Run(run func(ctx context.Context, accountNumber string)) *MockAccountRepository_FindByAccountNumberForUpdate_Call {
+func (_c *MockAccountRepository_FindByCardTokenForUpdate_Call) Run(run func(ctx context.Context, cardToken string)) *MockAccountRepository_FindByCardTokenForUpdate_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		run(args[0].(context.Context), args[1].(string))
 	})
 	return _c
 }
 
-func (_c *MockAccountRepository_FindByAccountNumberForUpdate_Call) Return(_a0 *models.Account, _a1 error) *MockAccountRepository_FindByAccountNumberForUpdate_Call {
+func (_c *MockAccountRepository_FindByCardTokenForUpdate_Call) Return(_a0 *models.Account, _a1 error) *MockAccountRepository_FindByCardTokenForUpdate_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockAccountRepository_FindByAccountNumberForUpdate_Call) RunAndReturn(run func(context.Context, string) (*models.Account, error)) *MockAccountRepository_FindByAccountNumberForUpdate_Call {
+func (_c *MockAccountRepository_FindByCardTokenForUpdate_Call) RunAndReturn(run func(context.Context, string) (*models.Account, error)) *MockAccountRepository_FindByCardTokenForUpdate_Call {
 	_c.Call.Return(run)
 	return _c
 }

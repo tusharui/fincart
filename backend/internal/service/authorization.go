@@ -6,10 +6,11 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/tusharui/payment-gateway/backend/internal/db"
 	"github.com/tusharui/payment-gateway/backend/internal/models"
 	"github.com/tusharui/payment-gateway/backend/internal/repository"
-	"github.com/google/uuid"
+	"github.com/tusharui/payment-gateway/backend/internal/security"
 )
 
 // AuthorizationService handles payment authorization operations
@@ -72,7 +73,8 @@ func (s *AuthorizationService) performAuthorization(
 	cardNumber, cvv string,
 	amount int64,
 ) (*models.Transaction, error) {
-	account, err := accountRepo.FindByAccountNumberForUpdate(ctx, cardNumber)
+	cardToken := security.HashToken(cardNumber)
+	account, err := accountRepo.FindByCardTokenForUpdate(ctx, cardToken)
 	if err != nil {
 		return nil, &ServiceError{
 			Code:    ErrCodeInvalidCard,
@@ -80,10 +82,10 @@ func (s *AuthorizationService) performAuthorization(
 		}
 	}
 
-	if account.CVV != cvv {
+	if err := ValidateCVV(cvv); err != nil {
 		return nil, &ServiceError{
 			Code:    ErrCodeInvalidCVV,
-			Message: "CVV does not match",
+			Message: err.Error(),
 		}
 	}
 

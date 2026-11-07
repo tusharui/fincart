@@ -9,34 +9,34 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestAccountRepository_FindByAccountNumber(t *testing.T) {
+func TestAccountRepository_FindByCardToken(t *testing.T) {
 	database := setupTestDB(t)
 	defer cleanupTestDB(t, database)
 
 	repo := NewAccountRepository(database)
 
 	tests := []struct {
-		name          string
-		accountNumber string
-		wantCVV       string
-		wantErr       bool
+		name      string
+		cardToken string
+		wantLast4 string
+		wantErr   bool
 	}{
 		{
-			name:          "existing account",
-			accountNumber: "4111111111111111",
-			wantErr:       false,
-			wantCVV:       "123",
+			name:      "existing account",
+			cardToken: "4111111111111111",
+			wantErr:   false,
+			wantLast4: "123",
 		},
 		{
-			name:          "non-existent account",
-			accountNumber: "9999999999999999",
-			wantErr:       true,
+			name:      "non-existent account",
+			cardToken: "9999999999999999",
+			wantErr:   true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			account, err := repo.FindByAccountNumber(context.Background(), tt.accountNumber)
+			account, err := repo.FindByCardToken(context.Background(), tt.cardToken)
 
 			if tt.wantErr {
 				assert.Error(t, err, "expected error")
@@ -47,8 +47,8 @@ func TestAccountRepository_FindByAccountNumber(t *testing.T) {
 			require.NoError(t, err, "unexpected error")
 			require.NotNil(t, account, "expected account")
 
-			assert.Equal(t, tt.accountNumber, account.AccountNumber, "account number mismatch")
-			assert.Equal(t, tt.wantCVV, account.CVV, "CVV mismatch")
+			assert.Equal(t, tt.cardToken, account.CardToken, "account number mismatch")
+			assert.Equal(t, tt.wantLast4, account.Last4, "CVV mismatch")
 			assert.NotEqual(t, uuid.Nil, account.ID, "account ID should not be nil")
 		})
 	}
@@ -60,7 +60,7 @@ func TestAccountRepository_FindByID(t *testing.T) {
 
 	repo := NewAccountRepository(database)
 
-	existingAccount, setupErr := repo.FindByAccountNumber(context.Background(), "4111111111111111")
+	existingAccount, setupErr := repo.FindByCardToken(context.Background(), "4111111111111111")
 	require.NoError(t, setupErr, "failed to get existing account")
 
 	tests := []struct {
@@ -101,7 +101,7 @@ func TestAccountRepository_AdjustBalances(t *testing.T) {
 
 	repo := NewAccountRepository(database)
 
-	account, setupErr := repo.FindByAccountNumber(context.Background(), "4111111111111111")
+	account, setupErr := repo.FindByCardToken(context.Background(), "4111111111111111")
 	require.NoError(t, setupErr, "failed to get existing account")
 
 	initialBalance := account.BalanceCents
@@ -206,7 +206,7 @@ func TestAccountRepository_AdjustBalances_Concurrent(t *testing.T) {
 
 	repo := NewAccountRepository(database)
 
-	account, setupErr := repo.FindByAccountNumber(context.Background(), "4111111111111111")
+	account, setupErr := repo.FindByCardToken(context.Background(), "4111111111111111")
 	require.NoError(t, setupErr, "failed to get account")
 
 	initialBalance := account.BalanceCents

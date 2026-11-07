@@ -7,12 +7,13 @@ import (
 	"github.com/google/uuid"
 )
 
-// Account represents a customer account with card details and balance
+// Account represents a tokenized customer card and its balance.
+// Raw PAN and CVV are never persisted; only the provider token and last4 are stored.
 type Account struct {
 	CreatedAt             time.Time `db:"created_at"`
 	UpdatedAt             time.Time `db:"updated_at"`
-	AccountNumber         string    `db:"account_number"`
-	CVV                   string    `db:"cvv"`
+	CardToken             string    `db:"card_token"`
+	Last4                 string    `db:"last4"`
 	BalanceCents          int64     `db:"balance_cents"`
 	AvailableBalanceCents int64     `db:"available_balance_cents"`
 	ExpiryMonth           int       `db:"expiry_month"`

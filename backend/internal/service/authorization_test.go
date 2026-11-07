@@ -5,11 +5,12 @@ import (
 	"database/sql"
 	"testing"
 
-	"github.com/tusharui/payment-gateway/backend/internal/models"
-	"github.com/tusharui/payment-gateway/backend/internal/repository/mocks"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/tusharui/payment-gateway/backend/internal/models"
+	"github.com/tusharui/payment-gateway/backend/internal/repository/mocks"
+	"github.com/tusharui/payment-gateway/backend/internal/security"
 )
 
 func TestAuthorizationService_PerformAuthorization(t *testing.T) {
@@ -26,15 +27,15 @@ func TestAuthorizationService_PerformAuthorization(t *testing.T) {
 
 		account := &models.Account{
 			ID:                    accountID,
-			AccountNumber:         cardNumber,
-			CVV:                   cvv,
+			CardToken:             security.HashToken(cardNumber),
+			Last4:                 "1111",
 			ExpiryMonth:           12,
 			ExpiryYear:            2030,
 			BalanceCents:          50000,
 			AvailableBalanceCents: 50000,
 		}
 
-		mockAccountRepo.On("FindByAccountNumberForUpdate", ctx, cardNumber).Return(account, nil)
+		mockAccountRepo.On("FindByCardTokenForUpdate", ctx, security.HashToken(cardNumber)).Return(account, nil)
 		mockTxRepo.On("Create", ctx, mock.AnythingOfType("*models.Transaction")).Return(nil)
 		mockAccountRepo.On("AdjustBalances", ctx, accountID, int64(0), int64(-10000)).Return(nil)
 
@@ -63,7 +64,7 @@ func TestAuthorizationService_PerformAuthorization(t *testing.T) {
 		cvv := "123"
 		var amount int64 = 10000
 
-		mockAccountRepo.On("FindByAccountNumberForUpdate", ctx, cardNumber).
+		mockAccountRepo.On("FindByCardTokenForUpdate", ctx, security.HashToken(cardNumber)).
 			Return(nil, sql.ErrNoRows)
 
 		result, err := service.performAuthorization(ctx, mockAccountRepo, mockTxRepo, cardNumber, cvv, amount)
@@ -87,20 +88,20 @@ func TestAuthorizationService_PerformAuthorization(t *testing.T) {
 
 		accountID := uuid.New()
 		cardNumber := "4111111111111111"
-		cvv := "999" // Wrong CVV
+		cvv := "12" // Invalid CVV format (must be 3-4 digits)
 		var amount int64 = 10000
 
 		account := &models.Account{
 			ID:                    accountID,
-			AccountNumber:         cardNumber,
-			CVV:                   "123", // Correct CVV
+			CardToken:             security.HashToken(cardNumber),
+			Last4:                 "1111", // Tokenized last4
 			ExpiryMonth:           12,
 			ExpiryYear:            2030,
 			BalanceCents:          50000,
 			AvailableBalanceCents: 50000,
 		}
 
-		mockAccountRepo.On("FindByAccountNumberForUpdate", ctx, cardNumber).Return(account, nil)
+		mockAccountRepo.On("FindByCardTokenForUpdate", ctx, security.HashToken(cardNumber)).Return(account, nil)
 
 		result, err := service.performAuthorization(ctx, mockAccountRepo, mockTxRepo, cardNumber, cvv, amount)
 
@@ -128,15 +129,15 @@ func TestAuthorizationService_PerformAuthorization(t *testing.T) {
 
 		account := &models.Account{
 			ID:                    accountID,
-			AccountNumber:         cardNumber,
-			CVV:                   cvv,
+			CardToken:             security.HashToken(cardNumber),
+			Last4:                 "1111",
 			ExpiryMonth:           1,
 			ExpiryYear:            2020, // Expired
 			BalanceCents:          50000,
 			AvailableBalanceCents: 50000,
 		}
 
-		mockAccountRepo.On("FindByAccountNumberForUpdate", ctx, cardNumber).Return(account, nil)
+		mockAccountRepo.On("FindByCardTokenForUpdate", ctx, security.HashToken(cardNumber)).Return(account, nil)
 
 		result, err := service.performAuthorization(ctx, mockAccountRepo, mockTxRepo, cardNumber, cvv, amount)
 
@@ -164,15 +165,15 @@ func TestAuthorizationService_PerformAuthorization(t *testing.T) {
 
 		account := &models.Account{
 			ID:                    accountID,
-			AccountNumber:         cardNumber,
-			CVV:                   cvv,
+			CardToken:             security.HashToken(cardNumber),
+			Last4:                 "1111",
 			ExpiryMonth:           12,
 			ExpiryYear:            2030,
 			BalanceCents:          5000,
 			AvailableBalanceCents: 5000, // Less than requested amount
 		}
 
-		mockAccountRepo.On("FindByAccountNumberForUpdate", ctx, cardNumber).Return(account, nil)
+		mockAccountRepo.On("FindByCardTokenForUpdate", ctx, security.HashToken(cardNumber)).Return(account, nil)
 
 		result, err := service.performAuthorization(ctx, mockAccountRepo, mockTxRepo, cardNumber, cvv, amount)
 
@@ -200,15 +201,15 @@ func TestAuthorizationService_PerformAuthorization(t *testing.T) {
 
 		account := &models.Account{
 			ID:                    accountID,
-			AccountNumber:         cardNumber,
-			CVV:                   cvv,
+			CardToken:             security.HashToken(cardNumber),
+			Last4:                 "1111",
 			ExpiryMonth:           12,
 			ExpiryYear:            2030,
 			BalanceCents:          50000,
 			AvailableBalanceCents: 50000,
 		}
 
-		mockAccountRepo.On("FindByAccountNumberForUpdate", ctx, cardNumber).Return(account, nil)
+		mockAccountRepo.On("FindByCardTokenForUpdate", ctx, security.HashToken(cardNumber)).Return(account, nil)
 		mockTxRepo.On("Create", ctx, mock.AnythingOfType("*models.Transaction")).
 			Return(models.ErrDuplicateTransaction)
 
@@ -239,15 +240,15 @@ func TestAuthorizationService_PerformAuthorization(t *testing.T) {
 
 		account := &models.Account{
 			ID:                    accountID,
-			AccountNumber:         cardNumber,
-			CVV:                   cvv,
+			CardToken:             security.HashToken(cardNumber),
+			Last4:                 "1111",
 			ExpiryMonth:           12,
 			ExpiryYear:            2030,
 			BalanceCents:          50000,
 			AvailableBalanceCents: 50000,
 		}
 
-		mockAccountRepo.On("FindByAccountNumberForUpdate", ctx, cardNumber).Return(account, nil)
+		mockAccountRepo.On("FindByCardTokenForUpdate", ctx, security.HashToken(cardNumber)).Return(account, nil)
 		mockTxRepo.On("Create", ctx, mock.AnythingOfType("*models.Transaction")).Return(nil)
 		mockAccountRepo.On("AdjustBalances", ctx, accountID, int64(0), int64(-10000)).
 			Return(assert.AnError)
