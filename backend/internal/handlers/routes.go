@@ -24,7 +24,10 @@ func NewRouter(
 	refundService := service.NewRefundService(database)
 
 	handler := NewHandler(authService, captureService, voidService, refundService, database, logger)
-	strictHandler := api.NewStrictHandler(handler, nil)
+	strictHandler := api.NewStrictHandlerWithOptions(handler, nil, api.StrictHTTPServerOptions{
+		RequestErrorHandlerFunc:  handler.requestErrorHandler,
+		ResponseErrorHandlerFunc: handler.responseErrorHandler,
+	})
 
 	mux := http.NewServeMux()
 	api.RegisterDocsRoutes(mux)

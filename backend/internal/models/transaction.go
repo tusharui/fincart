@@ -43,10 +43,15 @@ type Transaction struct {
 	CreatedAt   time.Time         `db:"created_at" gorm:"column:created_at"`
 }
 
+// IdempotencyStatusPending marks a key whose request is currently in flight.
+// Completed entries carry the HTTP status code that was cached.
+const IdempotencyStatusPending = 0
+
 // IdempotencyKey tracks processed requests to prevent duplicate transactions
 type IdempotencyKey struct {
 	Key            string    `db:"key" gorm:"column:key"`
 	RequestPath    string    `db:"request_path" gorm:"column:request_path"`
+	RequestHash    string    `db:"request_hash" gorm:"column:request_hash"`
 	ResponseBody   string    `db:"response_body" gorm:"column:response_body"`
 	ResponseStatus int       `db:"response_status" gorm:"column:response_status"`
 	CreatedAt      time.Time `db:"created_at" gorm:"column:created_at"`

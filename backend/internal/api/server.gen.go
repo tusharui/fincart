@@ -457,7 +457,11 @@ type InternalErrorJSONResponse ErrorResponse
 
 type NotFoundJSONResponse ErrorResponse
 
+type PayloadTooLargeJSONResponse ErrorResponse
+
 type PaymentRequiredJSONResponse ErrorResponse
+
+type ServiceUnavailableJSONResponse ErrorResponse
 
 type CreateAuthorizationRequestObject struct {
 	Params CreateAuthorizationParams
@@ -495,11 +499,38 @@ func (response CreateAuthorization402JSONResponse) VisitCreateAuthorizationRespo
 	return json.NewEncoder(w).Encode(response)
 }
 
+type CreateAuthorization409JSONResponse struct{ ConflictJSONResponse }
+
+func (response CreateAuthorization409JSONResponse) VisitCreateAuthorizationResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CreateAuthorization413JSONResponse struct{ PayloadTooLargeJSONResponse }
+
+func (response CreateAuthorization413JSONResponse) VisitCreateAuthorizationResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(413)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
 type CreateAuthorization500JSONResponse struct{ InternalErrorJSONResponse }
 
 func (response CreateAuthorization500JSONResponse) VisitCreateAuthorizationResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CreateAuthorization503JSONResponse struct{ ServiceUnavailableJSONResponse }
+
+func (response CreateAuthorization503JSONResponse) VisitCreateAuthorizationResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(503)
 
 	return json.NewEncoder(w).Encode(response)
 }
@@ -575,11 +606,29 @@ func (response CreateCapture409JSONResponse) VisitCreateCaptureResponse(w http.R
 	return json.NewEncoder(w).Encode(response)
 }
 
+type CreateCapture413JSONResponse struct{ PayloadTooLargeJSONResponse }
+
+func (response CreateCapture413JSONResponse) VisitCreateCaptureResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(413)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
 type CreateCapture500JSONResponse struct{ InternalErrorJSONResponse }
 
 func (response CreateCapture500JSONResponse) VisitCreateCaptureResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CreateCapture503JSONResponse struct{ ServiceUnavailableJSONResponse }
+
+func (response CreateCapture503JSONResponse) VisitCreateCaptureResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(503)
 
 	return json.NewEncoder(w).Encode(response)
 }
@@ -655,11 +704,29 @@ func (response CreateRefund409JSONResponse) VisitCreateRefundResponse(w http.Res
 	return json.NewEncoder(w).Encode(response)
 }
 
+type CreateRefund413JSONResponse struct{ PayloadTooLargeJSONResponse }
+
+func (response CreateRefund413JSONResponse) VisitCreateRefundResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(413)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
 type CreateRefund500JSONResponse struct{ InternalErrorJSONResponse }
 
 func (response CreateRefund500JSONResponse) VisitCreateRefundResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CreateRefund503JSONResponse struct{ ServiceUnavailableJSONResponse }
+
+func (response CreateRefund503JSONResponse) VisitCreateRefundResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(503)
 
 	return json.NewEncoder(w).Encode(response)
 }
@@ -735,11 +802,29 @@ func (response CreateVoid409JSONResponse) VisitCreateVoidResponse(w http.Respons
 	return json.NewEncoder(w).Encode(response)
 }
 
+type CreateVoid413JSONResponse struct{ PayloadTooLargeJSONResponse }
+
+func (response CreateVoid413JSONResponse) VisitCreateVoidResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(413)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
 type CreateVoid500JSONResponse struct{ InternalErrorJSONResponse }
 
 func (response CreateVoid500JSONResponse) VisitCreateVoidResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CreateVoid503JSONResponse struct{ ServiceUnavailableJSONResponse }
+
+func (response CreateVoid503JSONResponse) VisitCreateVoidResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(503)
 
 	return json.NewEncoder(w).Encode(response)
 }

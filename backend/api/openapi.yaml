@@ -72,6 +72,12 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '402':
           $ref: '#/components/responses/PaymentRequired'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
         '500':
           $ref: '#/components/responses/InternalError'
 
@@ -119,6 +125,10 @@ paths:
           $ref: '#/components/responses/NotFound'
         '409':
           $ref: '#/components/responses/Conflict'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
         '500':
           $ref: '#/components/responses/InternalError'
 
@@ -166,6 +176,10 @@ paths:
           $ref: '#/components/responses/NotFound'
         '409':
           $ref: '#/components/responses/Conflict'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
         '500':
           $ref: '#/components/responses/InternalError'
 
@@ -196,6 +210,10 @@ paths:
           $ref: '#/components/responses/NotFound'
         '409':
           $ref: '#/components/responses/Conflict'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
         '500':
           $ref: '#/components/responses/InternalError'
 
@@ -289,9 +307,15 @@ components:
         - invalid_card
         - invalid_cvv
         - invalid_amount
+        - invalid_request
+        - invalid_idempotency_key
         - card_expired
         - insufficient_funds
         - missing_idempotency_key
+        - idempotency_key_conflict
+        - idempotency_in_progress
+        - idempotency_unavailable
+        - request_too_large
         - authorization_not_found
         - authorization_expired
         - authorization_already_used
@@ -507,6 +531,18 @@ components:
             $ref: '#/components/schemas/ErrorResponse'
     Conflict:
       description: Resource is in a state that conflicts with the request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    PayloadTooLarge:
+      description: Request body exceeds the allowed size
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    ServiceUnavailable:
+      description: A required dependency is unavailable
       content:
         application/json:
           schema:

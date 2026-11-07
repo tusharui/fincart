@@ -29,14 +29,20 @@ const (
 	ErrorCodeCaptureNotCompleted      ErrorCode = "capture_not_completed"
 	ErrorCodeCaptureNotFound          ErrorCode = "capture_not_found"
 	ErrorCodeCardExpired              ErrorCode = "card_expired"
+	ErrorCodeIdempotencyInProgress    ErrorCode = "idempotency_in_progress"
+	ErrorCodeIdempotencyKeyConflict   ErrorCode = "idempotency_key_conflict"
+	ErrorCodeIdempotencyUnavailable   ErrorCode = "idempotency_unavailable"
 	ErrorCodeInsufficientFunds        ErrorCode = "insufficient_funds"
 	ErrorCodeInternalError            ErrorCode = "internal_error"
 	ErrorCodeInvalidAmount            ErrorCode = "invalid_amount"
 	ErrorCodeInvalidCard              ErrorCode = "invalid_card"
 	ErrorCodeInvalidCvv               ErrorCode = "invalid_cvv"
+	ErrorCodeInvalidIdempotencyKey    ErrorCode = "invalid_idempotency_key"
+	ErrorCodeInvalidRequest           ErrorCode = "invalid_request"
 	ErrorCodeMissingIdempotencyKey    ErrorCode = "missing_idempotency_key"
 	ErrorCodeNotFound                 ErrorCode = "not_found"
 	ErrorCodeRefundNotFound           ErrorCode = "refund_not_found"
+	ErrorCodeRequestTooLarge          ErrorCode = "request_too_large"
 )
 
 // Defines values for HealthResponseStatus.
@@ -184,8 +190,14 @@ type InternalError = ErrorResponse
 // NotFound defines model for NotFound.
 type NotFound = ErrorResponse
 
+// PayloadTooLarge defines model for PayloadTooLarge.
+type PayloadTooLarge = ErrorResponse
+
 // PaymentRequired defines model for PaymentRequired.
 type PaymentRequired = ErrorResponse
+
+// ServiceUnavailable defines model for ServiceUnavailable.
+type ServiceUnavailable = ErrorResponse
 
 // CreateAuthorizationParams defines parameters for CreateAuthorization.
 type CreateAuthorizationParams struct {

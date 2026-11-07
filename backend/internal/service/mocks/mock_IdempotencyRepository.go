@@ -23,6 +23,116 @@ func (_m *MockIdempotencyRepository) EXPECT() *MockIdempotencyRepository_Expecte
 	return &MockIdempotencyRepository_Expecter{mock: &_m.Mock}
 }
 
+// Claim provides a mock function with given fields: ctx, key, requestPath, requestHash
+func (_m *MockIdempotencyRepository) Claim(ctx context.Context, key string, requestPath string, requestHash string) (bool, error) {
+	ret := _m.Called(ctx, key, requestPath, requestHash)
+
+	if len(ret) == 0 {
+		panic("no return value specified for Claim")
+	}
+
+	var r0 bool
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string) (bool, error)); ok {
+		return rf(ctx, key, requestPath, requestHash)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string) bool); ok {
+		r0 = rf(ctx, key, requestPath, requestHash)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, string) error); ok {
+		r1 = rf(ctx, key, requestPath, requestHash)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockIdempotencyRepository_Claim_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Claim'
+type MockIdempotencyRepository_Claim_Call struct {
+	*mock.Call
+}
+
+// Claim is a helper method to define mock.On call
+//   - ctx context.Context
+//   - key string
+//   - requestPath string
+//   - requestHash string
+func (_e *MockIdempotencyRepository_Expecter) Claim(ctx interface{}, key interface{}, requestPath interface{}, requestHash interface{}) *MockIdempotencyRepository_Claim_Call {
+	return &MockIdempotencyRepository_Claim_Call{Call: _e.mock.On("Claim", ctx, key, requestPath, requestHash)}
+}
+
+func (_c *MockIdempotencyRepository_Claim_Call) Run(run func(ctx context.Context, key string, requestPath string, requestHash string)) *MockIdempotencyRepository_Claim_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(string))
+	})
+	return _c
+}
+
+func (_c *MockIdempotencyRepository_Claim_Call) Return(_a0 bool, _a1 error) *MockIdempotencyRepository_Claim_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockIdempotencyRepository_Claim_Call) RunAndReturn(run func(context.Context, string, string, string) (bool, error)) *MockIdempotencyRepository_Claim_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// Complete provides a mock function with given fields: ctx, key, requestPath, requestHash, responseStatus, responseBody
+func (_m *MockIdempotencyRepository) Complete(ctx context.Context, key string, requestPath string, requestHash string, responseStatus int, responseBody string) error {
+	ret := _m.Called(ctx, key, requestPath, requestHash, responseStatus, responseBody)
+
+	if len(ret) == 0 {
+		panic("no return value specified for Complete")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, int, string) error); ok {
+		r0 = rf(ctx, key, requestPath, requestHash, responseStatus, responseBody)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockIdempotencyRepository_Complete_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Complete'
+type MockIdempotencyRepository_Complete_Call struct {
+	*mock.Call
+}
+
+// Complete is a helper method to define mock.On call
+//   - ctx context.Context
+//   - key string
+//   - requestPath string
+//   - requestHash string
+//   - responseStatus int
+//   - responseBody string
+func (_e *MockIdempotencyRepository_Expecter) Complete(ctx interface{}, key interface{}, requestPath interface{}, requestHash interface{}, responseStatus interface{}, responseBody interface{}) *MockIdempotencyRepository_Complete_Call {
+	return &MockIdempotencyRepository_Complete_Call{Call: _e.mock.On("Complete", ctx, key, requestPath, requestHash, responseStatus, responseBody)}
+}
+
+func (_c *MockIdempotencyRepository_Complete_Call) Run(run func(ctx context.Context, key string, requestPath string, requestHash string, responseStatus int, responseBody string)) *MockIdempotencyRepository_Complete_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(string), args[4].(int), args[5].(string))
+	})
+	return _c
+}
+
+func (_c *MockIdempotencyRepository_Complete_Call) Return(_a0 error) *MockIdempotencyRepository_Complete_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockIdempotencyRepository_Complete_Call) RunAndReturn(run func(context.Context, string, string, string, int, string) error) *MockIdempotencyRepository_Complete_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // Get provides a mock function with given fields: ctx, key, requestPath
 func (_m *MockIdempotencyRepository) Get(ctx context.Context, key string, requestPath string) (*models.IdempotencyKey, error) {
 	ret := _m.Called(ctx, key, requestPath)
@@ -83,17 +193,17 @@ func (_c *MockIdempotencyRepository_Get_Call) RunAndReturn(run func(context.Cont
 	return _c
 }
 
-// Store provides a mock function with given fields: ctx, idemKey
-func (_m *MockIdempotencyRepository) Store(ctx context.Context, idemKey *models.IdempotencyKey) error {
-	ret := _m.Called(ctx, idemKey)
+// Release provides a mock function with given fields: ctx, key, requestPath, requestHash
+func (_m *MockIdempotencyRepository) Release(ctx context.Context, key string, requestPath string, requestHash string) error {
+	ret := _m.Called(ctx, key, requestPath, requestHash)
 
 	if len(ret) == 0 {
-		panic("no return value specified for Store")
+		panic("no return value specified for Release")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, *models.IdempotencyKey) error); ok {
-		r0 = rf(ctx, idemKey)
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string) error); ok {
+		r0 = rf(ctx, key, requestPath, requestHash)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -101,31 +211,33 @@ func (_m *MockIdempotencyRepository) Store(ctx context.Context, idemKey *models.
 	return r0
 }
 
-// MockIdempotencyRepository_Store_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Store'
-type MockIdempotencyRepository_Store_Call struct {
+// MockIdempotencyRepository_Release_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Release'
+type MockIdempotencyRepository_Release_Call struct {
 	*mock.Call
 }
 
-// Store is a helper method to define mock.On call
+// Release is a helper method to define mock.On call
 //   - ctx context.Context
-//   - idemKey *models.IdempotencyKey
-func (_e *MockIdempotencyRepository_Expecter) Store(ctx interface{}, idemKey interface{}) *MockIdempotencyRepository_Store_Call {
-	return &MockIdempotencyRepository_Store_Call{Call: _e.mock.On("Store", ctx, idemKey)}
+//   - key string
+//   - requestPath string
+//   - requestHash string
+func (_e *MockIdempotencyRepository_Expecter) Release(ctx interface{}, key interface{}, requestPath interface{}, requestHash interface{}) *MockIdempotencyRepository_Release_Call {
+	return &MockIdempotencyRepository_Release_Call{Call: _e.mock.On("Release", ctx, key, requestPath, requestHash)}
 }
 
-func (_c *MockIdempotencyRepository_Store_Call) Run(run func(ctx context.Context, idemKey *models.IdempotencyKey)) *MockIdempotencyRepository_Store_Call {
+func (_c *MockIdempotencyRepository_Release_Call) Run(run func(ctx context.Context, key string, requestPath string, requestHash string)) *MockIdempotencyRepository_Release_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(*models.IdempotencyKey))
+		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(string))
 	})
 	return _c
 }
 
-func (_c *MockIdempotencyRepository_Store_Call) Return(_a0 error) *MockIdempotencyRepository_Store_Call {
+func (_c *MockIdempotencyRepository_Release_Call) Return(_a0 error) *MockIdempotencyRepository_Release_Call {
 	_c.Call.Return(_a0)
 	return _c
 }
 
-func (_c *MockIdempotencyRepository_Store_Call) RunAndReturn(run func(context.Context, *models.IdempotencyKey) error) *MockIdempotencyRepository_Store_Call {
+func (_c *MockIdempotencyRepository_Release_Call) RunAndReturn(run func(context.Context, string, string, string) error) *MockIdempotencyRepository_Release_Call {
 	_c.Call.Return(run)
 	return _c
 }

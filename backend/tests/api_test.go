@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"strings"
 	"sync"
 	"testing"
 
@@ -245,6 +246,50 @@ func TestIdempotency_DifferentKeysCreateDifferentAuthorizations(t *testing.T) {
 	assert.NotEqual(t, body1["authorization_id"], body2["authorization_id"])
 }
 
+func TestIdempotency_ReusedKeyWithDifferentBodyIsRejected(t *testing.T) {
+	ts := SetupTest(t)
+	defer ts.Close()
+
+	const idempotencyKey = "payload-conflict-key"
+
+	resp1 := ts.Authorize(t, "4111111111111111", "123", 10000, idempotencyKey)
+	require.Equal(t, http.StatusOK, resp1.StatusCode)
+	resp1.Body.Close()
+
+	resp2 := ts.Authorize(t, "4111111111111111", "123", 20000, idempotencyKey)
+	require.Equal(t, http.StatusConflict, resp2.StatusCode)
+
+	var body map[string]any
+	require.NoError(t, json.NewDecoder(resp2.Body).Decode(&body))
+	resp2.Body.Close()
+
+	assert.Equal(t, "idempotency_key_conflict", body["error"])
+}
+
+func TestIdempotency_MissingKeyIsRejected(t *testing.T) {
+	ts := SetupTest(t)
+	defer ts.Close()
+
+	req, err := http.NewRequest(
+		http.MethodPost,
+		ts.URL("/api/v1/authorizations"),
+		strings.NewReader(`{"card_number":"4111111111111111","cvv":"123","amount":10000}`),
+	)
+	require.NoError(t, err)
+	req.Header.Set("Content-Type", "application/json")
+	// Intentionally no Idempotency-Key header.
+
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	require.Equal(t, http.StatusBadRequest, resp.StatusCode)
+
+	var body map[string]any
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&body))
+	assert.Equal(t, "missing_idempotency_key", body["error"])
+}
+
 func TestConcurrentCaptures_OnlyOneSucceeds(t *testing.T) {
 	ts := SetupTest(t)
 	defer ts.Close()
@@ -275,18 +320,18 @@ func TestConcurrentCaptures_OnlyOneSucceeds(t *testing.T) {
 	close(results)
 
 	successCount := 0
-	failCount := 0
+	conflictCount := 0
 	for code := range results {
 		switch code {
 		case http.StatusOK:
 			successCount++
-		case http.StatusBadRequest:
-			failCount++
+		case http.StatusConflict:
+			conflictCount++
 		}
 	}
 
 	assert.Equal(t, 1, successCount, "exactly one capture should succeed")
-	assert.Equal(t, numGoroutines-1, failCount, "all others should fail")
+	assert.Equal(t, numGoroutines-1, conflictCount, "all others should conflict")
 }
 
 func TestGetAuthorization(t *testing.T) {
