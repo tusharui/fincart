@@ -1,0 +1,27 @@
+with-expecter: true
+resolve-type-alias: false
+disable-version-string: true
+issue-845-fix: true
+packages:
+  github.com/tusharui/payment-gateway/backend/internal/repository:
+    config:
+      dir: "internal/repository/mocks"
+      outpkg: mocks
+    interfaces:
+      AccountRepository:
+      TransactionRepository:
+  github.com/tusharui/payment-gateway/backend/internal/service:
+    config:
+      dir: "internal/service/mocks"
+      outpkg: mocks
+    interfaces:
+      Authorizer:
+      Capturer:
+      Voider:
+      Refunder:
+  github.com/tusharui/payment-gateway/backend/internal/middleware:
+    config:
+      dir: "internal/service/mocks"
+      outpkg: mocks
+    interfaces:
+      IdempotencyRepository:

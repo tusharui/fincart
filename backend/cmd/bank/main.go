@@ -1,0 +1,119 @@
+// Package main implements the mock bank API server.
+package main
+
+import (
+	"context"
+	"log/slog"
+	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
+
+	"github.com/tusharui/payment-gateway/backend/internal/config"
+	"github.com/tusharui/payment-gateway/backend/internal/db"
+	"github.com/tusharui/payment-gateway/backend/internal/handlers"
+)
+
+func main() {
+	cfg, err := config.Load()
+	if err != nil {
+		slog.Error("failed to load configuration", "error", err)
+		os.Exit(1)
+	}
+
+	logger := cfg.Logger.NewLogger()
+	slog.SetDefault(logger)
+
+	logger.Info("starting bank api",
+		"port", cfg.Server.Port,
+		"log_level", cfg.Logger.Level,
+	)
+
+	ctx := context.Background()
+	database, err := db.Connect(ctx, &cfg.Database, logger)
+	if err != nil {
+		logger.Error("failed to connect to database", "error", err)
+		os.Exit(1)
+	}
+	defer func() {
+		if err = database.Close(); err != nil {
+			logger.Error("failed to close database connection", "error", err)
+		}
+	}()
+
+	// Start periodic cleanup goroutine
+	stopCleanup := make(chan struct{})
+	go runPeriodicCleanup(database, logger, stopCleanup)
+
+	router := handlers.NewRouter(database, cfg, logger)
+
+	server := &http.Server{
+		Addr:         ":" + cfg.Server.Port,
+		Handler:      router,
+		ReadTimeout:  cfg.Server.ReadTimeout,
+		WriteTimeout: cfg.Server.WriteTimeout,
+		IdleTimeout:  cfg.Server.IdleTimeout,
+	}
+
+	go func() {
+		logger.Info("server listening", "address", server.Addr)
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			logger.Error("server failed", "error", err)
+			os.Exit(1)
+		}
+	}()
+
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	<-quit
+
+	logger.Info("shutting down server...")
+	close(stopCleanup)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	if err := server.Shutdown(ctx); err != nil {
+		logger.Error("server forced to shutdown", "error", err)
+	}
+
+	logger.Info("server stopped")
+}
+
+// cleanupIdempotencyKeys removes idempotency keys older than 24 hours
+func cleanupIdempotencyKeys(ctx context.Context, database *db.DB, logger *slog.Logger) {
+	cutoffTime := time.Now().Add(-24 * time.Hour)
+	result, err := database.ExecContext(ctx, "DELETE FROM idempotency_keys WHERE created_at < $1", cutoffTime)
+	if err != nil {
+		logger.Warn("failed to cleanup old idempotency keys", "error", err)
+		return
+	}
+
+	rowsDeleted, err := result.RowsAffected()
+	if err != nil {
+		logger.Warn("failed to get rows affected", "error", err)
+		return
+	}
+	if rowsDeleted > 0 {
+		logger.Info("cleaned up old idempotency keys", "rows_deleted", rowsDeleted)
+	}
+}
+
+// runPeriodicCleanup runs idempotency key cleanup every hour
+func runPeriodicCleanup(database *db.DB, logger *slog.Logger, stop <-chan struct{}) {
+	ticker := time.NewTicker(1 * time.Hour)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			cleanupIdempotencyKeys(ctx, database, logger)
+			cancel()
+		case <-stop:
+			logger.Info("stopping periodic cleanup")
+			return
+		}
+	}
+}
