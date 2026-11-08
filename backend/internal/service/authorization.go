@@ -32,9 +32,18 @@ func NewAuthorizationService(
 	}
 }
 
+// AuthorizationRequest describes the inputs for creating an authorization hold.
+type AuthorizationRequest struct {
+	CardNumber string
+	CVV        string
+	Amount     int64
+	OrderID    *uuid.UUID
+	CustomerID *uuid.UUID
+}
+
 // Authorize creates an authorization hold on a customer's account
-func (s *AuthorizationService) Authorize(ctx context.Context, cardNumber, cvv string, amount int64) (*models.Transaction, error) {
-	if err := s.validateAuthorizationRequest(cardNumber, cvv, amount); err != nil {
+func (s *AuthorizationService) Authorize(ctx context.Context, request AuthorizationRequest) (*models.Transaction, error) {
+	if err := s.validateAuthorizationRequest(request.CardNumber, request.CVV, request.Amount); err != nil {
 		return nil, err
 	}
 
@@ -43,7 +52,7 @@ func (s *AuthorizationService) Authorize(ctx context.Context, cardNumber, cvv st
 		accountRepo := repository.NewAccountRepository(tx)
 		transactionRepo := repository.NewTransactionRepository(tx)
 
-		result, err := s.performAuthorization(ctx, accountRepo, transactionRepo, cardNumber, cvv, amount)
+		result, err := s.performAuthorization(ctx, accountRepo, transactionRepo, request)
 		if err != nil {
 			return err
 		}
@@ -63,10 +72,9 @@ func (s *AuthorizationService) performAuthorization(
 	ctx context.Context,
 	accountRepo repository.AccountRepository,
 	transactionRepo repository.TransactionRepository,
-	cardNumber, cvv string,
-	amount int64,
+	request AuthorizationRequest,
 ) (*models.Transaction, error) {
-	cardToken := security.HashToken(cardNumber)
+	cardToken := security.HashToken(request.CardNumber)
 	account, err := accountRepo.FindByCardTokenForUpdate(ctx, cardToken)
 	if err != nil {
 		return nil, &ServiceError{
@@ -75,7 +83,7 @@ func (s *AuthorizationService) performAuthorization(
 		}
 	}
 
-	if err := ValidateCVV(cvv); err != nil {
+	if err := ValidateCVV(request.CVV); err != nil {
 		return nil, &ServiceError{
 			Code:    ErrCodeInvalidCVV,
 			Message: err.Error(),
@@ -89,7 +97,7 @@ func (s *AuthorizationService) performAuthorization(
 		}
 	}
 
-	if account.AvailableBalanceCents < amount {
+	if account.AvailableBalanceCents < request.Amount {
 		return nil, &ServiceError{
 			Code:    ErrCodeInsufficientFunds,
 			Message: "insufficient funds",
@@ -103,8 +111,10 @@ func (s *AuthorizationService) performAuthorization(
 	authTx := &models.Transaction{
 		ID:          authID,
 		AccountID:   account.ID,
+		OrderID:     request.OrderID,
+		CustomerID:  request.CustomerID,
 		Type:        models.TransactionTypeAuthHold,
-		AmountCents: amount,
+		AmountCents: request.Amount,
 		Currency:    "USD",
 		Status:      models.TransactionStatusActive,
 		ExpiresAt:   &expiresAt,
@@ -118,7 +128,7 @@ func (s *AuthorizationService) performAuthorization(
 		}
 	}
 
-	if err := accountRepo.AdjustBalances(ctx, account.ID, 0, -amount); err != nil {
+	if err := accountRepo.AdjustBalances(ctx, account.ID, 0, -request.Amount); err != nil {
 		if errors.Is(err, models.ErrInsufficientFunds) {
 			return nil, &ServiceError{
 				Code:    ErrCodeInsufficientFunds,

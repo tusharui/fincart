@@ -33,6 +33,8 @@ func (h *Handler) CreateRefund(
 		Status:     api.Refunded,
 		Amount:     txn.AmountCents,
 		Currency:   txn.Currency,
+		OrderId:    formatOptionalUUID(txn.OrderID),
+		CustomerId: formatOptionalUUID(txn.CustomerID),
 		RefundedAt: txn.CreatedAt,
 	}, nil
 }
@@ -70,6 +72,8 @@ func (h *Handler) GetRefund(
 		Status:     api.Refunded,
 		Amount:     txn.AmountCents,
 		Currency:   txn.Currency,
+		OrderId:    formatOptionalUUID(txn.OrderID),
+		CustomerId: formatOptionalUUID(txn.CustomerID),
 		RefundedAt: txn.CreatedAt,
 	}, nil
 }

@@ -35,6 +35,17 @@ func formatRefundID(id uuid.UUID) string {
 	return PrefixRefund + id.String()
 }
 
+// formatOptionalUUID renders an optional UUID reference for API responses. A
+// missing link is returned as an empty string, which the generated response
+// types omit from JSON.
+func formatOptionalUUID(id *uuid.UUID) string {
+	if id == nil {
+		return ""
+	}
+
+	return id.String()
+}
+
 func parseAuthorizationID(id string) (uuid.UUID, error) {
 	return parseIDWithPrefix(id, PrefixAuthorization, "authorization")
 }
@@ -59,6 +70,21 @@ func parseIDWithPrefix(id, prefix, typeName string) (uuid.UUID, error) {
 	}
 
 	return parsed, nil
+}
+
+// parseOptionalUUID parses an optional UUID field from a request body. An empty
+// value means the field was not supplied.
+func parseOptionalUUID(value, fieldName string) (*uuid.UUID, error) {
+	if value == "" {
+		return nil, nil
+	}
+
+	parsed, err := uuid.Parse(value)
+	if err != nil {
+		return nil, fmt.Errorf("%s must be a valid UUID", fieldName)
+	}
+
+	return &parsed, nil
 }
 
 // mapAuthorizationStatus maps an internal authorization status to the public

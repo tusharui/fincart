@@ -33,6 +33,8 @@ func (h *Handler) CreateCapture(
 		Status:          api.CaptureResponseStatusCaptured,
 		Amount:          txn.AmountCents,
 		Currency:        txn.Currency,
+		OrderId:         formatOptionalUUID(txn.OrderID),
+		CustomerId:      formatOptionalUUID(txn.CustomerID),
 		CapturedAt:      txn.CreatedAt,
 	}, nil
 }
@@ -70,6 +72,8 @@ func (h *Handler) GetCapture(
 		Status:          mapCaptureStatus(txn.Status),
 		Amount:          txn.AmountCents,
 		Currency:        txn.Currency,
+		OrderId:         formatOptionalUUID(txn.OrderID),
+		CustomerId:      formatOptionalUUID(txn.CustomerID),
 		CapturedAt:      txn.CreatedAt,
 	}, nil
 }

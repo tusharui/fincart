@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/tusharui/payment-gateway/backend/internal/api"
+	"github.com/tusharui/payment-gateway/backend/internal/service"
 )
 
 // CreateAuthorization handles POST /api/v1/authorizations
@@ -12,13 +13,23 @@ func (h *Handler) CreateAuthorization(
 	ctx context.Context,
 	request api.CreateAuthorizationRequestObject,
 ) (api.CreateAuthorizationResponseObject, error) {
-	txn, err := h.authService.Authorize(
-		ctx,
-		request.Body.CardNumber,
-		request.Body.Cvv,
-		request.Body.Amount,
-	)
+	orderID, err := parseOptionalUUID(request.Body.OrderId, "order_id")
+	if err != nil {
+		return invalidAuthorizationRequest(err.Error()), nil
+	}
 
+	customerID, err := parseOptionalUUID(request.Body.CustomerId, "customer_id")
+	if err != nil {
+		return invalidAuthorizationRequest(err.Error()), nil
+	}
+
+	txn, err := h.authService.Authorize(ctx, service.AuthorizationRequest{
+		CardNumber: request.Body.CardNumber,
+		CVV:        request.Body.Cvv,
+		Amount:     request.Body.Amount,
+		OrderID:    orderID,
+		CustomerID: customerID,
+	})
 	if err != nil {
 		return h.handleAuthorizationError(err)
 	}
@@ -28,9 +39,20 @@ func (h *Handler) CreateAuthorization(
 		Status:          api.AuthorizationResponseStatusApproved,
 		Amount:          txn.AmountCents,
 		Currency:        txn.Currency,
+		OrderId:         formatOptionalUUID(txn.OrderID),
+		CustomerId:      formatOptionalUUID(txn.CustomerID),
 		ExpiresAt:       *txn.ExpiresAt,
 		CreatedAt:       txn.CreatedAt,
 	}, nil
+}
+
+func invalidAuthorizationRequest(message string) api.CreateAuthorizationResponseObject {
+	return api.CreateAuthorization400JSONResponse{
+		BadRequestJSONResponse: api.BadRequestJSONResponse{
+			Error:   api.ErrorCodeInvalidRequest,
+			Message: message,
+		},
+	}
 }
 
 // GetAuthorization handles GET /api/v1/authorizations/{authorizationId}
@@ -70,6 +92,8 @@ func (h *Handler) GetAuthorization(
 		Status:          mapAuthorizationStatus(txn.Status),
 		Amount:          txn.AmountCents,
 		Currency:        txn.Currency,
+		OrderId:         formatOptionalUUID(txn.OrderID),
+		CustomerId:      formatOptionalUUID(txn.CustomerID),
 		ExpiresAt:       expiresAt,
 		CreatedAt:       txn.CreatedAt,
 	}, nil

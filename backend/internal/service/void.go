@@ -87,6 +87,8 @@ func (s *VoidService) performVoid(
 	voidTxn := &models.Transaction{
 		ID:          voidID,
 		AccountID:   authTxn.AccountID,
+		OrderID:     authTxn.OrderID,
+		CustomerID:  authTxn.CustomerID,
 		Type:        models.TransactionTypeVoid,
 		AmountCents: authTxn.AmountCents,
 		Currency:    authTxn.Currency,

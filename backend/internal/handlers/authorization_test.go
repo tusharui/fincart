@@ -26,22 +26,33 @@ func TestCreateAuthorization_Success(t *testing.T) {
 	handler := NewHandler(mockAuth, nil, nil, nil, nil, testLogger())
 
 	txnID := uuid.New()
+	orderID := uuid.New()
+	customerID := uuid.New()
 	expiresAt := time.Now().Add(24 * time.Hour)
 
-	mockAuth.On("Authorize", mock.Anything, "4111111111111111", "123", int64(10000)).
-		Return(&models.Transaction{
-			ID:          txnID,
-			AmountCents: 10000,
-			Currency:    "USD",
-			ExpiresAt:   &expiresAt,
-			CreatedAt:   time.Now(),
-		}, nil)
+	mockAuth.On("Authorize", mock.Anything, service.AuthorizationRequest{
+		CardNumber: "4111111111111111",
+		CVV:        "123",
+		Amount:     10000,
+		OrderID:    &orderID,
+		CustomerID: &customerID,
+	}).Return(&models.Transaction{
+		ID:          txnID,
+		AmountCents: 10000,
+		Currency:    "USD",
+		OrderID:     &orderID,
+		CustomerID:  &customerID,
+		ExpiresAt:   &expiresAt,
+		CreatedAt:   time.Now(),
+	}, nil)
 
 	req := api.CreateAuthorizationRequestObject{
 		Body: &api.CreateAuthorizationJSONRequestBody{
 			CardNumber: "4111111111111111",
 			Cvv:        "123",
 			Amount:     10000,
+			OrderId:    orderID.String(),
+			CustomerId: customerID.String(),
 		},
 	}
 
@@ -52,6 +63,30 @@ func TestCreateAuthorization_Success(t *testing.T) {
 	require.True(t, ok, "expected 200 response")
 	assert.Equal(t, api.AuthorizationResponseStatusApproved, successResp.Status)
 	assert.Equal(t, int64(10000), successResp.Amount)
+	assert.Equal(t, orderID.String(), successResp.OrderId)
+	assert.Equal(t, customerID.String(), successResp.CustomerId)
+}
+
+func TestCreateAuthorization_RejectsInvalidLinkage(t *testing.T) {
+	mockAuth := mocks.NewMockAuthorizer(t)
+	handler := NewHandler(mockAuth, nil, nil, nil, nil, testLogger())
+
+	req := api.CreateAuthorizationRequestObject{
+		Body: &api.CreateAuthorizationJSONRequestBody{
+			CardNumber: "4111111111111111",
+			Cvv:        "123",
+			Amount:     10000,
+			OrderId:    "not-a-uuid",
+		},
+	}
+
+	resp, err := handler.CreateAuthorization(context.Background(), req)
+
+	require.NoError(t, err)
+	badResp, ok := resp.(api.CreateAuthorization400JSONResponse)
+	require.True(t, ok, "expected 400 response")
+	assert.Equal(t, api.ErrorCodeInvalidRequest, badResp.Error)
+	mockAuth.AssertNotCalled(t, "Authorize", mock.Anything, mock.Anything)
 }
 
 func TestCreateAuthorization_ServiceErrors(t *testing.T) {
@@ -80,7 +115,7 @@ func TestCreateAuthorization_ServiceErrors(t *testing.T) {
 			mockAuth := mocks.NewMockAuthorizer(t)
 			handler := NewHandler(mockAuth, nil, nil, nil, nil, testLogger())
 
-			mockAuth.On("Authorize", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+			mockAuth.On("Authorize", mock.Anything, mock.Anything).
 				Return(nil, tt.serviceErr)
 
 			req := api.CreateAuthorizationRequestObject{
@@ -113,6 +148,8 @@ func TestGetAuthorization_Success(t *testing.T) {
 	handler := NewHandler(mockAuth, nil, nil, nil, nil, testLogger())
 
 	txnID := uuid.New()
+	orderID := uuid.New()
+	customerID := uuid.New()
 	expiresAt := time.Now().Add(24 * time.Hour)
 
 	mockAuth.On("GetAuthorization", mock.Anything, txnID).
@@ -120,6 +157,8 @@ func TestGetAuthorization_Success(t *testing.T) {
 			ID:          txnID,
 			AmountCents: 10000,
 			Currency:    "USD",
+			OrderID:     &orderID,
+			CustomerID:  &customerID,
 			ExpiresAt:   &expiresAt,
 			CreatedAt:   time.Now(),
 		}, nil)
@@ -131,8 +170,10 @@ func TestGetAuthorization_Success(t *testing.T) {
 	resp, err := handler.GetAuthorization(context.Background(), req)
 
 	require.NoError(t, err)
-	_, ok := resp.(api.GetAuthorization200JSONResponse)
+	typed, ok := resp.(api.GetAuthorization200JSONResponse)
 	require.True(t, ok)
+	assert.Equal(t, orderID.String(), typed.OrderId)
+	assert.Equal(t, customerID.String(), typed.CustomerId)
 }
 
 func TestGetAuthorization_StatusMapping(t *testing.T) {

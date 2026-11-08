@@ -88,6 +88,8 @@ func (s *CaptureService) performCapture(
 	captureTxn := &models.Transaction{
 		ID:          captureID,
 		AccountID:   authTxn.AccountID,
+		OrderID:     authTxn.OrderID,
+		CustomerID:  authTxn.CustomerID,
 		Type:        models.TransactionTypeCapture,
 		AmountCents: amount,
 		Currency:    authTxn.Currency,

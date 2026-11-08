@@ -366,6 +366,16 @@ components:
           description: Amount in cents
           minimum: 1
           example: 9999
+        order_id:
+          type: string
+          description: FicMart order identifier (UUID). Stored on the authorization and every transaction derived from it.
+          pattern: '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        customer_id:
+          type: string
+          description: FicMart customer identifier (UUID). Stored on the authorization and every transaction derived from it.
+          pattern: '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
+          example: "550e8400-e29b-41d4-a716-446655440001"
 
     AuthorizationResponse:
       type: object
@@ -385,6 +395,14 @@ components:
         currency:
           type: string
           example: "USD"
+        order_id:
+          type: string
+          description: FicMart order identifier when linked
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        customer_id:
+          type: string
+          description: FicMart customer identifier when linked
+          example: "550e8400-e29b-41d4-a716-446655440001"
         expires_at:
           type: string
           format: date-time
@@ -432,6 +450,14 @@ components:
         currency:
           type: string
           example: "USD"
+        order_id:
+          type: string
+          description: FicMart order identifier when linked
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        customer_id:
+          type: string
+          description: FicMart customer identifier when linked
+          example: "550e8400-e29b-41d4-a716-446655440001"
         captured_at:
           type: string
           format: date-time
@@ -462,6 +488,14 @@ components:
         status:
           type: string
           enum: [voided]
+        order_id:
+          type: string
+          description: FicMart order identifier when linked
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        customer_id:
+          type: string
+          description: FicMart customer identifier when linked
+          example: "550e8400-e29b-41d4-a716-446655440001"
         voided_at:
           type: string
           format: date-time
@@ -505,6 +539,14 @@ components:
         currency:
           type: string
           example: "USD"
+        order_id:
+          type: string
+          description: FicMart order identifier when linked
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        customer_id:
+          type: string
+          description: FicMart customer identifier when linked
+          example: "550e8400-e29b-41d4-a716-446655440001"
         refunded_at:
           type: string
           format: date-time

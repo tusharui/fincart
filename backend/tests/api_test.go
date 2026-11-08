@@ -102,6 +102,121 @@ func TestFullFlow_AuthorizeCaptureRefund(t *testing.T) {
 	assert.Contains(t, refundBody["refund_id"].(string), "ref_")
 }
 
+func TestOrderCustomerLinkage_PropagatesThroughLifecycle(t *testing.T) {
+	ts := SetupTest(t)
+	defer ts.Close()
+
+	orderID := uuid.New()
+	customerID := uuid.New()
+
+	authResp := ts.AuthorizeLinked(t, "4111111111111111", "123", 10000, orderID.String(), customerID.String(), "linkage-auth")
+	require.Equal(t, http.StatusOK, authResp.StatusCode)
+
+	var authBody map[string]any
+	require.NoError(t, json.NewDecoder(authResp.Body).Decode(&authBody))
+	authResp.Body.Close()
+
+	assert.Equal(t, orderID.String(), authBody["order_id"])
+	assert.Equal(t, customerID.String(), authBody["customer_id"])
+	authID := authBody["authorization_id"].(string)
+
+	getAuth, err := http.Get(ts.URL("/api/v1/authorizations/" + authID))
+	require.NoError(t, err)
+	require.Equal(t, http.StatusOK, getAuth.StatusCode)
+	var getAuthBody map[string]any
+	require.NoError(t, json.NewDecoder(getAuth.Body).Decode(&getAuthBody))
+	getAuth.Body.Close()
+	assert.Equal(t, orderID.String(), getAuthBody["order_id"])
+	assert.Equal(t, customerID.String(), getAuthBody["customer_id"])
+
+	captureResp := ts.Capture(t, authID, 10000, "linkage-cap")
+	require.Equal(t, http.StatusOK, captureResp.StatusCode)
+	var captureBody map[string]any
+	require.NoError(t, json.NewDecoder(captureResp.Body).Decode(&captureBody))
+	captureResp.Body.Close()
+	assert.Equal(t, orderID.String(), captureBody["order_id"])
+	assert.Equal(t, customerID.String(), captureBody["customer_id"])
+	captureID := captureBody["capture_id"].(string)
+
+	getCapture, err := http.Get(ts.URL("/api/v1/captures/" + captureID))
+	require.NoError(t, err)
+	require.Equal(t, http.StatusOK, getCapture.StatusCode)
+	var getCaptureBody map[string]any
+	require.NoError(t, json.NewDecoder(getCapture.Body).Decode(&getCaptureBody))
+	getCapture.Body.Close()
+	assert.Equal(t, orderID.String(), getCaptureBody["order_id"])
+	assert.Equal(t, customerID.String(), getCaptureBody["customer_id"])
+
+	refundResp := ts.Refund(t, captureID, 10000, "linkage-refund")
+	require.Equal(t, http.StatusOK, refundResp.StatusCode)
+	var refundBody map[string]any
+	require.NoError(t, json.NewDecoder(refundResp.Body).Decode(&refundBody))
+	refundResp.Body.Close()
+	assert.Equal(t, orderID.String(), refundBody["order_id"])
+	assert.Equal(t, customerID.String(), refundBody["customer_id"])
+	refundID := refundBody["refund_id"].(string)
+
+	getRefund, err := http.Get(ts.URL("/api/v1/refunds/" + refundID))
+	require.NoError(t, err)
+	require.Equal(t, http.StatusOK, getRefund.StatusCode)
+	var getRefundBody map[string]any
+	require.NoError(t, json.NewDecoder(getRefund.Body).Decode(&getRefundBody))
+	getRefund.Body.Close()
+	assert.Equal(t, orderID.String(), getRefundBody["order_id"])
+	assert.Equal(t, customerID.String(), getRefundBody["customer_id"])
+
+	var persisted []models.Transaction
+	require.NoError(t, ts.Database.GORM().Where("order_id = ?", orderID).Order("created_at").Find(&persisted).Error)
+	require.Len(t, persisted, 3, "authorization, capture, and refund should all carry the linkage")
+	for _, txn := range persisted {
+		if assert.NotNil(t, txn.CustomerID) {
+			assert.Equal(t, customerID, *txn.CustomerID)
+		}
+	}
+}
+
+func TestOrderCustomerLinkage_PropagatesToVoid(t *testing.T) {
+	ts := SetupTest(t)
+	defer ts.Close()
+
+	orderID := uuid.New()
+	customerID := uuid.New()
+
+	authResp := ts.AuthorizeLinked(t, "4111111111111111", "123", 20000, orderID.String(), customerID.String(), "linkage-void-auth")
+	require.Equal(t, http.StatusOK, authResp.StatusCode)
+
+	var authBody map[string]any
+	require.NoError(t, json.NewDecoder(authResp.Body).Decode(&authBody))
+	authResp.Body.Close()
+	authID := authBody["authorization_id"].(string)
+
+	voidResp := ts.Void(t, authID, "linkage-void")
+	require.Equal(t, http.StatusOK, voidResp.StatusCode)
+
+	var voidBody map[string]any
+	require.NoError(t, json.NewDecoder(voidResp.Body).Decode(&voidBody))
+	voidResp.Body.Close()
+	assert.Equal(t, orderID.String(), voidBody["order_id"])
+	assert.Equal(t, customerID.String(), voidBody["customer_id"])
+}
+
+func TestAuthorization_RejectsInvalidLinkage(t *testing.T) {
+	ts := SetupTest(t)
+	defer ts.Close()
+
+	resp := ts.AuthorizeLinked(t, "4111111111111111", "123", 10000, "not-a-uuid", "", "invalid-linkage")
+	require.Equal(t, http.StatusBadRequest, resp.StatusCode)
+
+	var body map[string]any
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&body))
+	resp.Body.Close()
+	assert.Equal(t, "invalid_request", body["error"])
+
+	var count int64
+	require.NoError(t, ts.Database.GORM().Model(&models.Transaction{}).Count(&count).Error)
+	assert.Zero(t, count, "invalid linkage must not create a transaction")
+}
+
 func TestAuthorization_InvalidCard(t *testing.T) {
 	ts := SetupTest(t)
 	defer ts.Close()

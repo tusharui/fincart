@@ -6,6 +6,7 @@ import (
 	context "context"
 
 	models "github.com/tusharui/payment-gateway/backend/internal/models"
+	service "github.com/tusharui/payment-gateway/backend/internal/service"
 	mock "github.com/stretchr/testify/mock"
 
 	uuid "github.com/google/uuid"
@@ -24,9 +25,9 @@ func (_m *MockAuthorizer) EXPECT() *MockAuthorizer_Expecter {
 	return &MockAuthorizer_Expecter{mock: &_m.Mock}
 }
 
-// Authorize provides a mock function with given fields: ctx, cardNumber, cvv, amount
-func (_m *MockAuthorizer) Authorize(ctx context.Context, cardNumber string, cvv string, amount int64) (*models.Transaction, error) {
-	ret := _m.Called(ctx, cardNumber, cvv, amount)
+// Authorize provides a mock function with given fields: ctx, request
+func (_m *MockAuthorizer) Authorize(ctx context.Context, request service.AuthorizationRequest) (*models.Transaction, error) {
+	ret := _m.Called(ctx, request)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Authorize")
@@ -34,19 +35,19 @@ func (_m *MockAuthorizer) Authorize(ctx context.Context, cardNumber string, cvv 
 
 	var r0 *models.Transaction
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, int64) (*models.Transaction, error)); ok {
-		return rf(ctx, cardNumber, cvv, amount)
+	if rf, ok := ret.Get(0).(func(context.Context, service.AuthorizationRequest) (*models.Transaction, error)); ok {
+		return rf(ctx, request)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, int64) *models.Transaction); ok {
-		r0 = rf(ctx, cardNumber, cvv, amount)
+	if rf, ok := ret.Get(0).(func(context.Context, service.AuthorizationRequest) *models.Transaction); ok {
+		r0 = rf(ctx, request)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*models.Transaction)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string, string, int64) error); ok {
-		r1 = rf(ctx, cardNumber, cvv, amount)
+	if rf, ok := ret.Get(1).(func(context.Context, service.AuthorizationRequest) error); ok {
+		r1 = rf(ctx, request)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -61,16 +62,14 @@ type MockAuthorizer_Authorize_Call struct {
 
 // Authorize is a helper method to define mock.On call
 //   - ctx context.Context
-//   - cardNumber string
-//   - cvv string
-//   - amount int64
-func (_e *MockAuthorizer_Expecter) Authorize(ctx interface{}, cardNumber interface{}, cvv interface{}, amount interface{}) *MockAuthorizer_Authorize_Call {
-	return &MockAuthorizer_Authorize_Call{Call: _e.mock.On("Authorize", ctx, cardNumber, cvv, amount)}
+//   - request service.AuthorizationRequest
+func (_e *MockAuthorizer_Expecter) Authorize(ctx interface{}, request interface{}) *MockAuthorizer_Authorize_Call {
+	return &MockAuthorizer_Authorize_Call{Call: _e.mock.On("Authorize", ctx, request)}
 }
 
-func (_c *MockAuthorizer_Authorize_Call) Run(run func(ctx context.Context, cardNumber string, cvv string, amount int64)) *MockAuthorizer_Authorize_Call {
+func (_c *MockAuthorizer_Authorize_Call) Run(run func(ctx context.Context, request service.AuthorizationRequest)) *MockAuthorizer_Authorize_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(int64))
+		run(args[0].(context.Context), args[1].(service.AuthorizationRequest))
 	})
 	return _c
 }
@@ -80,7 +79,7 @@ func (_c *MockAuthorizer_Authorize_Call) Return(_a0 *models.Transaction, _a1 err
 	return _c
 }
 
-func (_c *MockAuthorizer_Authorize_Call) RunAndReturn(run func(context.Context, string, string, int64) (*models.Transaction, error)) *MockAuthorizer_Authorize_Call {
+func (_c *MockAuthorizer_Authorize_Call) RunAndReturn(run func(context.Context, service.AuthorizationRequest) (*models.Transaction, error)) *MockAuthorizer_Authorize_Call {
 	_c.Call.Return(run)
 	return _c
 }

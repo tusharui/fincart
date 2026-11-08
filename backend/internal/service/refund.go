@@ -92,6 +92,8 @@ func (s *RefundService) performRefund(
 	refundTxn := &models.Transaction{
 		ID:          refundID,
 		AccountID:   captureTxn.AccountID,
+		OrderID:     captureTxn.OrderID,
+		CustomerID:  captureTxn.CustomerID,
 		Type:        models.TransactionTypeRefund,
 		AmountCents: amount,
 		Currency:    captureTxn.Currency,

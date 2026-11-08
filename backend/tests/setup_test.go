@@ -100,10 +100,29 @@ func resetTestData(t *testing.T, database *db.DB) {
 func (ts *TestServer) Authorize(t *testing.T, cardNumber, cvv string, amount int64, idempotencyKey string) *http.Response {
 	t.Helper()
 
+	return ts.AuthorizeLinked(t, cardNumber, cvv, amount, "", "", idempotencyKey)
+}
+
+// AuthorizeLinked sends a POST request to create an authorization with optional
+// order and customer linkage supplied as raw strings (empty means omitted).
+func (ts *TestServer) AuthorizeLinked(
+	t *testing.T,
+	cardNumber, cvv string,
+	amount int64,
+	orderID, customerID, idempotencyKey string,
+) *http.Response {
+	t.Helper()
+
 	body := map[string]any{
 		"card_number": cardNumber,
 		"cvv":         cvv,
 		"amount":      amount,
+	}
+	if orderID != "" {
+		body["order_id"] = orderID
+	}
+	if customerID != "" {
+		body["customer_id"] = customerID
 	}
 	jsonBody, _ := json.Marshal(body)
 

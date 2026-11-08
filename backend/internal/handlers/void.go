@@ -31,6 +31,8 @@ func (h *Handler) CreateVoid(
 		VoidId:          formatVoidID(txn.ID),
 		AuthorizationId: formatAuthorizationID(*txn.ReferenceID),
 		Status:          api.Voided,
+		OrderId:         formatOptionalUUID(txn.OrderID),
+		CustomerId:      formatOptionalUUID(txn.CustomerID),
 		VoidedAt:        txn.CreatedAt,
 	}, nil
 }

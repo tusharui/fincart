@@ -40,7 +40,11 @@ func TestAuthorizationService_PerformAuthorization(t *testing.T) {
 		mockTxRepo.On("Create", ctx, mock.AnythingOfType("*models.Transaction")).Return(nil)
 		mockAccountRepo.On("AdjustBalances", ctx, accountID, int64(0), int64(-10000)).Return(nil)
 
-		result, err := service.performAuthorization(ctx, mockAccountRepo, mockTxRepo, cardNumber, cvv, amount)
+		result, err := service.performAuthorization(ctx, mockAccountRepo, mockTxRepo, AuthorizationRequest{
+			CardNumber: cardNumber,
+			CVV:        cvv,
+			Amount:     amount,
+		})
 
 		assert.NoError(t, err)
 		assert.NotNil(t, result)
@@ -50,6 +54,58 @@ func TestAuthorizationService_PerformAuthorization(t *testing.T) {
 		assert.Equal(t, "USD", result.Currency)
 		assert.Equal(t, models.TransactionStatusActive, result.Status)
 		assert.NotNil(t, result.ExpiresAt)
+
+		mockAccountRepo.AssertExpectations(t)
+		mockTxRepo.AssertExpectations(t)
+	})
+
+	t.Run("persists order and customer linkage", func(t *testing.T) {
+		mockAccountRepo := mocks.NewMockAccountRepository(t)
+		mockTxRepo := mocks.NewMockTransactionRepository(t)
+		service := NewAuthorizationService(nil, 168)
+		ctx := context.Background()
+
+		accountID := uuid.New()
+		orderID := uuid.New()
+		customerID := uuid.New()
+		cardNumber := "4111111111111111"
+		cvv := "123"
+		var amount int64 = 10000
+
+		account := &models.Account{
+			ID:                    accountID,
+			CardToken:             security.HashToken(cardNumber),
+			Last4:                 "1111",
+			ExpiryMonth:           12,
+			ExpiryYear:            2030,
+			BalanceCents:          50000,
+			AvailableBalanceCents: 50000,
+		}
+
+		mockAccountRepo.On("FindByCardTokenForUpdate", ctx, security.HashToken(cardNumber)).Return(account, nil)
+		mockTxRepo.On("Create", ctx, mock.MatchedBy(func(txn *models.Transaction) bool {
+			return txn.OrderID != nil && *txn.OrderID == orderID &&
+				txn.CustomerID != nil && *txn.CustomerID == customerID
+		})).Return(nil)
+		mockAccountRepo.On("AdjustBalances", ctx, accountID, int64(0), int64(-10000)).Return(nil)
+
+		result, err := service.performAuthorization(ctx, mockAccountRepo, mockTxRepo, AuthorizationRequest{
+			CardNumber: cardNumber,
+			CVV:        cvv,
+			Amount:     amount,
+			OrderID:    &orderID,
+			CustomerID: &customerID,
+		})
+
+		assert.NoError(t, err)
+		if assert.NotNil(t, result) {
+			if assert.NotNil(t, result.OrderID) {
+				assert.Equal(t, orderID, *result.OrderID)
+			}
+			if assert.NotNil(t, result.CustomerID) {
+				assert.Equal(t, customerID, *result.CustomerID)
+			}
+		}
 
 		mockAccountRepo.AssertExpectations(t)
 		mockTxRepo.AssertExpectations(t)
@@ -68,7 +124,11 @@ func TestAuthorizationService_PerformAuthorization(t *testing.T) {
 		mockAccountRepo.On("FindByCardTokenForUpdate", ctx, security.HashToken(cardNumber)).
 			Return(nil, sql.ErrNoRows)
 
-		result, err := service.performAuthorization(ctx, mockAccountRepo, mockTxRepo, cardNumber, cvv, amount)
+		result, err := service.performAuthorization(ctx, mockAccountRepo, mockTxRepo, AuthorizationRequest{
+			CardNumber: cardNumber,
+			CVV:        cvv,
+			Amount:     amount,
+		})
 
 		assert.Error(t, err)
 		assert.Nil(t, result)
@@ -104,7 +164,11 @@ func TestAuthorizationService_PerformAuthorization(t *testing.T) {
 
 		mockAccountRepo.On("FindByCardTokenForUpdate", ctx, security.HashToken(cardNumber)).Return(account, nil)
 
-		result, err := service.performAuthorization(ctx, mockAccountRepo, mockTxRepo, cardNumber, cvv, amount)
+		result, err := service.performAuthorization(ctx, mockAccountRepo, mockTxRepo, AuthorizationRequest{
+			CardNumber: cardNumber,
+			CVV:        cvv,
+			Amount:     amount,
+		})
 
 		assert.Error(t, err)
 		assert.Nil(t, result)
@@ -140,7 +204,11 @@ func TestAuthorizationService_PerformAuthorization(t *testing.T) {
 
 		mockAccountRepo.On("FindByCardTokenForUpdate", ctx, security.HashToken(cardNumber)).Return(account, nil)
 
-		result, err := service.performAuthorization(ctx, mockAccountRepo, mockTxRepo, cardNumber, cvv, amount)
+		result, err := service.performAuthorization(ctx, mockAccountRepo, mockTxRepo, AuthorizationRequest{
+			CardNumber: cardNumber,
+			CVV:        cvv,
+			Amount:     amount,
+		})
 
 		assert.Error(t, err)
 		assert.Nil(t, result)
@@ -176,7 +244,11 @@ func TestAuthorizationService_PerformAuthorization(t *testing.T) {
 
 		mockAccountRepo.On("FindByCardTokenForUpdate", ctx, security.HashToken(cardNumber)).Return(account, nil)
 
-		result, err := service.performAuthorization(ctx, mockAccountRepo, mockTxRepo, cardNumber, cvv, amount)
+		result, err := service.performAuthorization(ctx, mockAccountRepo, mockTxRepo, AuthorizationRequest{
+			CardNumber: cardNumber,
+			CVV:        cvv,
+			Amount:     amount,
+		})
 
 		assert.Error(t, err)
 		assert.Nil(t, result)
@@ -214,7 +286,11 @@ func TestAuthorizationService_PerformAuthorization(t *testing.T) {
 		mockTxRepo.On("Create", ctx, mock.AnythingOfType("*models.Transaction")).
 			Return(models.ErrDuplicateTransaction)
 
-		result, err := service.performAuthorization(ctx, mockAccountRepo, mockTxRepo, cardNumber, cvv, amount)
+		result, err := service.performAuthorization(ctx, mockAccountRepo, mockTxRepo, AuthorizationRequest{
+			CardNumber: cardNumber,
+			CVV:        cvv,
+			Amount:     amount,
+		})
 
 		assert.Error(t, err)
 		assert.Nil(t, result)
@@ -254,7 +330,11 @@ func TestAuthorizationService_PerformAuthorization(t *testing.T) {
 		mockAccountRepo.On("AdjustBalances", ctx, accountID, int64(0), int64(-10000)).
 			Return(assert.AnError)
 
-		result, err := service.performAuthorization(ctx, mockAccountRepo, mockTxRepo, cardNumber, cvv, amount)
+		result, err := service.performAuthorization(ctx, mockAccountRepo, mockTxRepo, AuthorizationRequest{
+			CardNumber: cardNumber,
+			CVV:        cvv,
+			Amount:     amount,
+		})
 
 		assert.Error(t, err)
 		assert.Nil(t, result)
@@ -294,7 +374,11 @@ func TestAuthorizationService_PerformAuthorization(t *testing.T) {
 		mockAccountRepo.On("AdjustBalances", ctx, accountID, int64(0), int64(-10000)).
 			Return(fmt.Errorf("guard: %w", models.ErrInsufficientFunds))
 
-		result, err := service.performAuthorization(ctx, mockAccountRepo, mockTxRepo, cardNumber, cvv, amount)
+		result, err := service.performAuthorization(ctx, mockAccountRepo, mockTxRepo, AuthorizationRequest{
+			CardNumber: cardNumber,
+			CVV:        cvv,
+			Amount:     amount,
+		})
 
 		assert.Error(t, err)
 		assert.Nil(t, result)

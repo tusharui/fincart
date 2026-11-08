@@ -67,12 +67,18 @@ const (
 
 // AuthorizationResponse defines model for AuthorizationResponse.
 type AuthorizationResponse struct {
-	Amount          int64                       `json:"amount"`
-	AuthorizationId string                      `json:"authorization_id"`
-	CreatedAt       time.Time                   `json:"created_at"`
-	Currency        string                      `json:"currency"`
-	ExpiresAt       time.Time                   `json:"expires_at"`
-	Status          AuthorizationResponseStatus `json:"status"`
+	Amount          int64     `json:"amount"`
+	AuthorizationId string    `json:"authorization_id"`
+	CreatedAt       time.Time `json:"created_at"`
+	Currency        string    `json:"currency"`
+
+	// CustomerId FicMart customer identifier when linked
+	CustomerId string    `json:"customer_id,omitempty,omitzero"`
+	ExpiresAt  time.Time `json:"expires_at"`
+
+	// OrderId FicMart order identifier when linked
+	OrderId string                      `json:"order_id,omitempty,omitzero"`
+	Status  AuthorizationResponseStatus `json:"status"`
 }
 
 // AuthorizationResponseStatus defines model for AuthorizationResponse.Status.
@@ -80,12 +86,18 @@ type AuthorizationResponseStatus string
 
 // CaptureResponse defines model for CaptureResponse.
 type CaptureResponse struct {
-	Amount          int64                 `json:"amount"`
-	AuthorizationId string                `json:"authorization_id"`
-	CaptureId       string                `json:"capture_id"`
-	CapturedAt      time.Time             `json:"captured_at"`
-	Currency        string                `json:"currency"`
-	Status          CaptureResponseStatus `json:"status"`
+	Amount          int64     `json:"amount"`
+	AuthorizationId string    `json:"authorization_id"`
+	CaptureId       string    `json:"capture_id"`
+	CapturedAt      time.Time `json:"captured_at"`
+	Currency        string    `json:"currency"`
+
+	// CustomerId FicMart customer identifier when linked
+	CustomerId string `json:"customer_id,omitempty,omitzero"`
+
+	// OrderId FicMart order identifier when linked
+	OrderId string                `json:"order_id,omitempty,omitzero"`
+	Status  CaptureResponseStatus `json:"status"`
 }
 
 // CaptureResponseStatus defines model for CaptureResponse.Status.
@@ -99,10 +111,16 @@ type CreateAuthorizationRequest struct {
 	// CardNumber Card number (Luhn validated)
 	CardNumber string `json:"card_number"`
 
+	// CustomerId FicMart customer identifier (UUID). Stored on the authorization and every transaction derived from it.
+	CustomerId string `json:"customer_id,omitempty,omitzero"`
+
 	// Cvv Card verification value
 	Cvv         string `json:"cvv"`
 	ExpiryMonth int    `json:"expiry_month"`
 	ExpiryYear  int    `json:"expiry_year"`
+
+	// OrderId FicMart order identifier (UUID). Stored on the authorization and every transaction derived from it.
+	OrderId string `json:"order_id,omitempty,omitzero"`
 }
 
 // CreateCaptureRequest defines model for CreateCaptureRequest.
@@ -148,9 +166,15 @@ type HealthResponseStatus string
 
 // RefundResponse defines model for RefundResponse.
 type RefundResponse struct {
-	Amount     int64                `json:"amount"`
-	CaptureId  string               `json:"capture_id"`
-	Currency   string               `json:"currency"`
+	Amount    int64  `json:"amount"`
+	CaptureId string `json:"capture_id"`
+	Currency  string `json:"currency"`
+
+	// CustomerId FicMart customer identifier when linked
+	CustomerId string `json:"customer_id,omitempty,omitzero"`
+
+	// OrderId FicMart order identifier when linked
+	OrderId    string               `json:"order_id,omitempty,omitzero"`
 	RefundId   string               `json:"refund_id"`
 	RefundedAt time.Time            `json:"refunded_at"`
 	Status     RefundResponseStatus `json:"status"`
@@ -161,10 +185,16 @@ type RefundResponseStatus string
 
 // VoidResponse defines model for VoidResponse.
 type VoidResponse struct {
-	AuthorizationId string             `json:"authorization_id"`
-	Status          VoidResponseStatus `json:"status"`
-	VoidId          string             `json:"void_id"`
-	VoidedAt        time.Time          `json:"voided_at"`
+	AuthorizationId string `json:"authorization_id"`
+
+	// CustomerId FicMart customer identifier when linked
+	CustomerId string `json:"customer_id,omitempty,omitzero"`
+
+	// OrderId FicMart order identifier when linked
+	OrderId  string             `json:"order_id,omitempty,omitzero"`
+	Status   VoidResponseStatus `json:"status"`
+	VoidId   string             `json:"void_id"`
+	VoidedAt time.Time          `json:"voided_at"`
 }
 
 // VoidResponseStatus defines model for VoidResponse.Status.

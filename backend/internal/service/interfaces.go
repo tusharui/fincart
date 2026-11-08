@@ -14,7 +14,7 @@ type HealthChecker interface {
 
 // Authorizer handles payment authorization operations
 type Authorizer interface {
-	Authorize(ctx context.Context, cardNumber, cvv string, amount int64) (*models.Transaction, error)
+	Authorize(ctx context.Context, request AuthorizationRequest) (*models.Transaction, error)
 	GetAuthorization(ctx context.Context, authID uuid.UUID) (*models.Transaction, error)
 }
 
