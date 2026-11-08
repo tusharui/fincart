@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/joho/godotenv"
 	"github.com/tusharui/payment-gateway/backend/internal/config"
 	"github.com/tusharui/payment-gateway/backend/internal/db"
 	"github.com/tusharui/payment-gateway/backend/internal/handlers"
@@ -18,6 +19,14 @@ import (
 )
 
 func main() {
+	// Load .env for local development. Real environment variables (Docker,
+	// CI, shell) always take precedence, and a missing file is fine.
+	for _, path := range []string{".env", "../.env"} {
+		if err := godotenv.Load(path); err == nil {
+			break
+		}
+	}
+
 	cfg, err := config.Load()
 	if err != nil {
 		slog.Error("failed to load configuration", "error", err)

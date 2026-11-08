@@ -3,6 +3,7 @@ package config
 
 import (
 	"fmt"
+	"net/url"
 	"os"
 	"strconv"
 	"time"
@@ -26,6 +27,10 @@ type ServerConfig struct {
 
 // DatabaseConfig holds database connection configuration
 type DatabaseConfig struct {
+	// URL is a complete PostgreSQL connection string. When set it takes
+	// precedence over the individual Host/Port/... fields, which makes it
+	// possible to target managed databases such as Neon.
+	URL             string
 	Host            string
 	Port            string
 	User            string
@@ -63,6 +68,7 @@ func Load() (*Config, error) {
 			IdleTimeout:  getEnvAsDuration("SERVER_IDLE_TIMEOUT", "60s"),
 		},
 		Database: DatabaseConfig{
+			URL:             getEnv("DATABASE_URL", ""),
 			Host:            getEnv("DB_HOST", "localhost"),
 			Port:            getEnv("DB_PORT", "5432"),
 			User:            getEnv("DB_USER", "postgres"),
@@ -98,11 +104,13 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("server port cannot be empty")
 	}
 
-	if c.Database.Host == "" {
-		return fmt.Errorf("database host cannot be empty")
-	}
-	if c.Database.DBName == "" {
-		return fmt.Errorf("database name cannot be empty")
+	if c.Database.URL == "" {
+		if c.Database.Host == "" {
+			return fmt.Errorf("database host cannot be empty")
+		}
+		if c.Database.DBName == "" {
+			return fmt.Errorf("database name cannot be empty")
+		}
 	}
 
 	if c.App.FailureRate < 0 || c.App.FailureRate > 1 {
@@ -126,10 +134,33 @@ func (c *Config) Validate() error {
 
 // DSN returns the PostgreSQL connection string
 func (c *DatabaseConfig) DSN() string {
+	if c.URL != "" {
+		return stripUnsupportedDSNParams(c.URL)
+	}
+
 	return fmt.Sprintf(
 		"host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
 		c.Host, c.Port, c.User, c.Password, c.DBName, c.SSLMode,
 	)
+}
+
+// stripUnsupportedDSNParams removes libpq-only connection options that the
+// pure-Go driver would forward to the server as runtime parameters, where they
+// are rejected. channel_binding is consumed by libpq itself, so the server has
+// no such setting.
+func stripUnsupportedDSNParams(raw string) string {
+	u, err := url.Parse(raw)
+	if err != nil || u.Scheme == "" {
+		return raw
+	}
+
+	if u.Query().Has("channel_binding") {
+		query := u.Query()
+		query.Del("channel_binding")
+		u.RawQuery = query.Encode()
+	}
+
+	return u.String()
 }
 
 func getEnv(key, defaultValue string) string {

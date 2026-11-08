@@ -35,11 +35,15 @@ func (db *DB) GORM() *gorm.DB {
 // Connect establishes a connection to the database and initializes GORM on top
 // of the same connection pool.
 func Connect(ctx context.Context, cfg *config.DatabaseConfig, logger *slog.Logger) (*DB, error) {
-	logger.Info("connecting to database",
-		"host", cfg.Host,
-		"port", cfg.Port,
-		"database", cfg.DBName,
-	)
+	if cfg.URL != "" {
+		logger.Info("connecting to database", "source", "DATABASE_URL")
+	} else {
+		logger.Info("connecting to database",
+			"host", cfg.Host,
+			"port", cfg.Port,
+			"database", cfg.DBName,
+		)
+	}
 
 	sqlDB, err := sql.Open("postgres", cfg.DSN())
 	if err != nil {
