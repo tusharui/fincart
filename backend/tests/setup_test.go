@@ -25,6 +25,10 @@ type TestServer struct {
 	Server   *httptest.Server
 	Database *db.DB
 	t        *testing.T
+
+	// initialBalances records the settled balance each seeded account started
+	// with so ledger reconciliation can be checked against a known baseline.
+	initialBalances map[uuid.UUID]int64
 }
 
 // SetupTest creates a new test server with a clean database state.
@@ -44,15 +48,16 @@ func SetupTest(t *testing.T) *TestServer {
 	database, err := db.Connect(context.Background(), &cfg.Database, logger)
 	require.NoError(t, err, "failed to connect to database")
 
-	resetTestData(t, database)
+	initialBalances := resetTestData(t, database)
 
 	router := handlers.NewRouter(database, cfg, logger)
 	server := httptest.NewServer(router)
 
 	return &TestServer{
-		Server:   server,
-		Database: database,
-		t:        t,
+		Server:          server,
+		Database:        database,
+		t:               t,
+		initialBalances: initialBalances,
 	}
 }
 
@@ -67,7 +72,7 @@ func (ts *TestServer) URL(path string) string {
 	return ts.Server.URL + path
 }
 
-func resetTestData(t *testing.T, database *db.DB) {
+func resetTestData(t *testing.T, database *db.DB) map[uuid.UUID]int64 {
 	t.Helper()
 
 	_, err := database.ExecContext(context.Background(),
@@ -94,6 +99,13 @@ func resetTestData(t *testing.T, database *db.DB) {
 	}
 
 	require.NoError(t, database.GORM().Create(&accounts).Error, "failed to seed accounts")
+
+	initialBalances := make(map[uuid.UUID]int64, len(accounts))
+	for _, account := range accounts {
+		initialBalances[account.ID] = account.BalanceCents
+	}
+
+	return initialBalances
 }
 
 // Authorize sends a POST request to create an authorization.
