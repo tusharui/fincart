@@ -30,7 +30,7 @@ func (h *Handler) CreateCapture(
 	return api.CreateCapture200JSONResponse{
 		CaptureId:       formatCaptureID(txn.ID),
 		AuthorizationId: formatAuthorizationID(*txn.ReferenceID),
-		Status:          api.Captured,
+		Status:          api.CaptureResponseStatusCaptured,
 		Amount:          txn.AmountCents,
 		Currency:        txn.Currency,
 		CapturedAt:      txn.CreatedAt,
@@ -67,7 +67,7 @@ func (h *Handler) GetCapture(
 	return api.GetCapture200JSONResponse{
 		CaptureId:       formatCaptureID(txn.ID),
 		AuthorizationId: formatAuthorizationID(*txn.ReferenceID),
-		Status:          api.Captured,
+		Status:          mapCaptureStatus(txn.Status),
 		Amount:          txn.AmountCents,
 		Currency:        txn.Currency,
 		CapturedAt:      txn.CreatedAt,

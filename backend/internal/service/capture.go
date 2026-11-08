@@ -65,10 +65,7 @@ func (s *CaptureService) performCapture(
 	}
 
 	if authTxn.Status != models.TransactionStatusActive {
-		return nil, &ServiceError{
-			Code:    ErrCodeAuthAlreadyUsed,
-			Message: "authorization has already been completed or cancelled",
-		}
+		return nil, authHoldStateError(authTxn.Status)
 	}
 
 	if authTxn.ExpiresAt != nil && time.Now().After(*authTxn.ExpiresAt) {

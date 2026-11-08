@@ -1,6 +1,10 @@
 package service
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/tusharui/payment-gateway/backend/internal/models"
+)
 
 // ServiceError represents a business logic error with a code
 type ServiceError struct {
@@ -41,3 +45,26 @@ const (
 	ErrCodeRefundNotFound      = "refund_not_found"
 	ErrCodeInternalError       = "internal_error"
 )
+
+// authHoldStateError maps a non-active authorization status to the most
+// specific business error so clients can distinguish voided, expired, and
+// captured holds instead of always receiving "authorization already used".
+func authHoldStateError(status models.TransactionStatus) *ServiceError {
+	switch status {
+	case models.TransactionStatusVoided:
+		return &ServiceError{
+			Code:    ErrCodeAlreadyVoided,
+			Message: "authorization has already been voided",
+		}
+	case models.TransactionStatusExpired:
+		return &ServiceError{
+			Code:    ErrCodeAuthExpired,
+			Message: "authorization has expired",
+		}
+	default:
+		return &ServiceError{
+			Code:    ErrCodeAuthAlreadyUsed,
+			Message: "authorization has already been completed or cancelled",
+		}
+	}
+}

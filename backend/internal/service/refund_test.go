@@ -34,6 +34,7 @@ func TestRefundService_PerformRefund(t *testing.T) {
 
 		mockTxRepo.On("FindByIDForUpdate", ctx, captureID).Return(captureTx, nil)
 		mockTxRepo.On("Create", ctx, mock.AnythingOfType("*models.Transaction")).Return(nil)
+		mockTxRepo.On("UpdateStatus", ctx, captureID, models.TransactionStatusRefunded).Return(nil)
 		mockAccountRepo.On("AdjustBalances", ctx, accountID, int64(10000), int64(10000)).Return(nil)
 
 		result, err := service.performRefund(ctx, mockTxRepo, mockAccountRepo, captureID, amount)
@@ -209,6 +210,39 @@ func TestRefundService_PerformRefund(t *testing.T) {
 		mockTxRepo.AssertExpectations(t)
 	})
 
+	t.Run("capture already refunded", func(t *testing.T) {
+		mockTxRepo := mocks.NewMockTransactionRepository(t)
+		mockAccountRepo := mocks.NewMockAccountRepository(t)
+		service := NewRefundService(nil)
+		ctx := context.Background()
+
+		captureID := uuid.New()
+		accountID := uuid.New()
+		var amount int64 = 10000
+
+		captureTx := &models.Transaction{
+			ID:          captureID,
+			AccountID:   accountID,
+			Type:        models.TransactionTypeCapture,
+			AmountCents: amount,
+			Status:      models.TransactionStatusRefunded,
+		}
+
+		mockTxRepo.On("FindByIDForUpdate", ctx, captureID).Return(captureTx, nil)
+
+		result, err := service.performRefund(ctx, mockTxRepo, mockAccountRepo, captureID, amount)
+
+		assert.Error(t, err)
+		assert.Nil(t, result)
+
+		var svcErr *ServiceError
+		if assert.ErrorAs(t, err, &svcErr) {
+			assert.Equal(t, ErrCodeAlreadyRefunded, svcErr.Code)
+		}
+
+		mockTxRepo.AssertExpectations(t)
+	})
+
 	t.Run("transaction creation fails", func(t *testing.T) {
 		mockTxRepo := mocks.NewMockTransactionRepository(t)
 		mockAccountRepo := mocks.NewMockAccountRepository(t)
@@ -260,6 +294,7 @@ func TestRefundService_PerformRefund(t *testing.T) {
 
 		mockTxRepo.On("FindByIDForUpdate", ctx, captureID).Return(captureTx, nil)
 		mockTxRepo.On("Create", ctx, mock.AnythingOfType("*models.Transaction")).Return(nil)
+		mockTxRepo.On("UpdateStatus", ctx, captureID, models.TransactionStatusRefunded).Return(nil)
 		mockAccountRepo.On("AdjustBalances", ctx, accountID, int64(10000), int64(10000)).
 			Return(assert.AnError)
 

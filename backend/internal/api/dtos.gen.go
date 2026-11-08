@@ -9,12 +9,16 @@ import (
 
 // Defines values for AuthorizationResponseStatus.
 const (
-	Approved AuthorizationResponseStatus = "approved"
+	AuthorizationResponseStatusApproved AuthorizationResponseStatus = "approved"
+	AuthorizationResponseStatusCaptured AuthorizationResponseStatus = "captured"
+	AuthorizationResponseStatusExpired  AuthorizationResponseStatus = "expired"
+	AuthorizationResponseStatusVoided   AuthorizationResponseStatus = "voided"
 )
 
 // Defines values for CaptureResponseStatus.
 const (
-	Captured CaptureResponseStatus = "captured"
+	CaptureResponseStatusCaptured CaptureResponseStatus = "captured"
+	CaptureResponseStatusRefunded CaptureResponseStatus = "refunded"
 )
 
 // Defines values for ErrorCode.

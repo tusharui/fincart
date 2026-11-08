@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/tusharui/payment-gateway/backend/internal/api"
+	"github.com/tusharui/payment-gateway/backend/internal/models"
 	"github.com/tusharui/payment-gateway/backend/internal/service"
 )
 
@@ -58,6 +59,31 @@ func parseIDWithPrefix(id, prefix, typeName string) (uuid.UUID, error) {
 	}
 
 	return parsed, nil
+}
+
+// mapAuthorizationStatus maps an internal authorization status to the public
+// API representation returned when an authorization is read.
+func mapAuthorizationStatus(status models.TransactionStatus) api.AuthorizationResponseStatus {
+	switch status {
+	case models.TransactionStatusCompleted:
+		return api.AuthorizationResponseStatusCaptured
+	case models.TransactionStatusVoided:
+		return api.AuthorizationResponseStatusVoided
+	case models.TransactionStatusExpired:
+		return api.AuthorizationResponseStatusExpired
+	default:
+		return api.AuthorizationResponseStatusApproved
+	}
+}
+
+// mapCaptureStatus maps an internal capture status to the public API
+// representation returned when a capture is read.
+func mapCaptureStatus(status models.TransactionStatus) api.CaptureResponseStatus {
+	if status == models.TransactionStatusRefunded {
+		return api.CaptureResponseStatusRefunded
+	}
+
+	return api.CaptureResponseStatusCaptured
 }
 
 func mapServiceErrorToCode(code string) api.ErrorCode {

@@ -408,6 +408,101 @@ func TestGetAuthorization(t *testing.T) {
 
 	assert.Equal(t, authID, getBody["authorization_id"])
 	assert.Equal(t, float64(10000), getBody["amount"])
+	assert.Equal(t, "approved", getBody["status"])
+}
+
+func TestGetAuthorization_AfterCapture(t *testing.T) {
+	ts := SetupTest(t)
+	defer ts.Close()
+
+	authResp := ts.Authorize(t, "4111111111111111", "123", 10000, "get-auth-captured-key")
+	require.Equal(t, http.StatusOK, authResp.StatusCode)
+
+	var authBody map[string]any
+	require.NoError(t, json.NewDecoder(authResp.Body).Decode(&authBody))
+	authResp.Body.Close()
+	authID := authBody["authorization_id"].(string)
+
+	captureResp := ts.Capture(t, authID, 10000, "get-auth-captured-cap")
+	require.Equal(t, http.StatusOK, captureResp.StatusCode)
+	captureResp.Body.Close()
+
+	resp, err := http.Get(ts.URL("/api/v1/authorizations/" + authID))
+	require.NoError(t, err)
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+
+	var getBody map[string]any
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&getBody))
+	resp.Body.Close()
+
+	assert.Equal(t, "captured", getBody["status"])
+}
+
+func TestGetAuthorization_AfterVoid(t *testing.T) {
+	ts := SetupTest(t)
+	defer ts.Close()
+
+	authResp := ts.Authorize(t, "4111111111111111", "123", 10000, "get-auth-voided-key")
+	require.Equal(t, http.StatusOK, authResp.StatusCode)
+
+	var authBody map[string]any
+	require.NoError(t, json.NewDecoder(authResp.Body).Decode(&authBody))
+	authResp.Body.Close()
+	authID := authBody["authorization_id"].(string)
+
+	voidResp := ts.Void(t, authID, "get-auth-voided-void")
+	require.Equal(t, http.StatusOK, voidResp.StatusCode)
+	voidResp.Body.Close()
+
+	resp, err := http.Get(ts.URL("/api/v1/authorizations/" + authID))
+	require.NoError(t, err)
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+
+	var getBody map[string]any
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&getBody))
+	resp.Body.Close()
+
+	assert.Equal(t, "voided", getBody["status"])
+}
+
+func TestGetCapture_AfterRefund(t *testing.T) {
+	ts := SetupTest(t)
+	defer ts.Close()
+
+	authResp := ts.Authorize(t, "4111111111111111", "123", 10000, "get-cap-refunded-auth")
+	require.Equal(t, http.StatusOK, authResp.StatusCode)
+
+	var authBody map[string]any
+	require.NoError(t, json.NewDecoder(authResp.Body).Decode(&authBody))
+	authResp.Body.Close()
+	authID := authBody["authorization_id"].(string)
+
+	captureResp := ts.Capture(t, authID, 10000, "get-cap-refunded-cap")
+	require.Equal(t, http.StatusOK, captureResp.StatusCode)
+
+	var captureBody map[string]any
+	require.NoError(t, json.NewDecoder(captureResp.Body).Decode(&captureBody))
+	captureResp.Body.Close()
+	captureID := captureBody["capture_id"].(string)
+
+	getCapture := func() map[string]any {
+		resp, err := http.Get(ts.URL("/api/v1/captures/" + captureID))
+		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, resp.StatusCode)
+		defer resp.Body.Close()
+
+		var body map[string]any
+		require.NoError(t, json.NewDecoder(resp.Body).Decode(&body))
+		return body
+	}
+
+	assert.Equal(t, "captured", getCapture()["status"])
+
+	refundResp := ts.Refund(t, captureID, 10000, "get-cap-refunded-refund")
+	require.Equal(t, http.StatusOK, refundResp.StatusCode)
+	refundResp.Body.Close()
+
+	assert.Equal(t, "refunded", getCapture()["status"])
 }
 
 func TestGetAuthorization_NotFound(t *testing.T) {

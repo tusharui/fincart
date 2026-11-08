@@ -23,8 +23,10 @@ type TransactionStatus string
 // Transaction status constants
 const (
 	TransactionStatusActive    TransactionStatus = "ACTIVE"    // Transaction is active (auth holds)
-	TransactionStatusCompleted TransactionStatus = "COMPLETED" // Transaction completed successfully
+	TransactionStatusCompleted TransactionStatus = "COMPLETED" // Transaction completed successfully (captured)
 	TransactionStatusExpired   TransactionStatus = "EXPIRED"   // Transaction expired (auth timeout)
+	TransactionStatusVoided    TransactionStatus = "VOIDED"    // Authorization was voided before capture
+	TransactionStatusRefunded  TransactionStatus = "REFUNDED"  // Capture was fully refunded
 )
 
 // Transaction represents a ledger entry for account activity

@@ -7,14 +7,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/tusharui/payment-gateway/backend/internal/api"
-	"github.com/tusharui/payment-gateway/backend/internal/models"
-	"github.com/tusharui/payment-gateway/backend/internal/service"
-	"github.com/tusharui/payment-gateway/backend/internal/service/mocks"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"github.com/tusharui/payment-gateway/backend/internal/api"
+	"github.com/tusharui/payment-gateway/backend/internal/models"
+	"github.com/tusharui/payment-gateway/backend/internal/service"
+	"github.com/tusharui/payment-gateway/backend/internal/service/mocks"
 )
 
 func testLogger() *slog.Logger {
@@ -50,7 +50,7 @@ func TestCreateAuthorization_Success(t *testing.T) {
 	require.NoError(t, err)
 	successResp, ok := resp.(api.CreateAuthorization200JSONResponse)
 	require.True(t, ok, "expected 200 response")
-	assert.Equal(t, api.Approved, successResp.Status)
+	assert.Equal(t, api.AuthorizationResponseStatusApproved, successResp.Status)
 	assert.Equal(t, int64(10000), successResp.Amount)
 }
 
@@ -133,6 +133,47 @@ func TestGetAuthorization_Success(t *testing.T) {
 	require.NoError(t, err)
 	_, ok := resp.(api.GetAuthorization200JSONResponse)
 	require.True(t, ok)
+}
+
+func TestGetAuthorization_StatusMapping(t *testing.T) {
+	tests := []struct {
+		name     string
+		status   models.TransactionStatus
+		expected api.AuthorizationResponseStatus
+	}{
+		{"active maps to approved", models.TransactionStatusActive, api.AuthorizationResponseStatusApproved},
+		{"completed maps to captured", models.TransactionStatusCompleted, api.AuthorizationResponseStatusCaptured},
+		{"voided maps to voided", models.TransactionStatusVoided, api.AuthorizationResponseStatusVoided},
+		{"expired maps to expired", models.TransactionStatusExpired, api.AuthorizationResponseStatusExpired},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockAuth := mocks.NewMockAuthorizer(t)
+			handler := NewHandler(mockAuth, nil, nil, nil, nil, testLogger())
+
+			txnID := uuid.New()
+			expiresAt := time.Now().Add(24 * time.Hour)
+			mockAuth.On("GetAuthorization", mock.Anything, txnID).
+				Return(&models.Transaction{
+					ID:          txnID,
+					AmountCents: 10000,
+					Currency:    "USD",
+					Status:      tt.status,
+					ExpiresAt:   &expiresAt,
+					CreatedAt:   time.Now(),
+				}, nil)
+
+			resp, err := handler.GetAuthorization(context.Background(), api.GetAuthorizationRequestObject{
+				AuthorizationId: "auth_" + txnID.String(),
+			})
+
+			require.NoError(t, err)
+			typed, ok := resp.(api.GetAuthorization200JSONResponse)
+			require.True(t, ok)
+			assert.Equal(t, tt.expected, typed.Status)
+		})
+	}
 }
 
 func TestGetAuthorization_NotFound(t *testing.T) {

@@ -376,7 +376,8 @@ components:
           example: "auth_550e8400-e29b-41d4-a716-446655440000"
         status:
           type: string
-          enum: [approved]
+          enum: [approved, captured, voided, expired]
+          x-enum-varnames: [Approved, Captured, Voided, Expired]
         amount:
           type: integer
           format: int64
@@ -422,7 +423,8 @@ components:
           example: "auth_550e8400-e29b-41d4-a716-446655440000"
         status:
           type: string
-          enum: [captured]
+          enum: [captured, refunded]
+          x-enum-varnames: [Captured, Refunded]
         amount:
           type: integer
           format: int64

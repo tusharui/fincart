@@ -64,6 +64,13 @@ func (s *RefundService) performRefund(
 		}
 	}
 
+	if captureTxn.Status == models.TransactionStatusRefunded {
+		return nil, &ServiceError{
+			Code:    ErrCodeAlreadyRefunded,
+			Message: "capture has already been refunded",
+		}
+	}
+
 	if captureTxn.Status != models.TransactionStatusCompleted {
 		return nil, &ServiceError{
 			Code:    ErrCodeCaptureNotCompleted,
@@ -101,6 +108,13 @@ func (s *RefundService) performRefund(
 			}
 		}
 		return nil, fmt.Errorf("failed to create refund: %w", err)
+	}
+
+	if err := transactionRepo.UpdateStatus(ctx, captureID, models.TransactionStatusRefunded); err != nil {
+		return nil, &ServiceError{
+			Code:    ErrCodeInternalError,
+			Message: fmt.Sprintf("failed to update capture: %v", err),
+		}
 	}
 
 	if err := accountRepo.AdjustBalances(ctx, captureTxn.AccountID, amount, amount); err != nil {

@@ -6,11 +6,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/tusharui/payment-gateway/backend/internal/models"
-	"github.com/tusharui/payment-gateway/backend/internal/repository/mocks"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/tusharui/payment-gateway/backend/internal/models"
+	"github.com/tusharui/payment-gateway/backend/internal/repository/mocks"
 )
 
 func TestCaptureService_PerformCapture(t *testing.T) {
@@ -139,6 +139,64 @@ func TestCaptureService_PerformCapture(t *testing.T) {
 		var svcErr *ServiceError
 		if assert.ErrorAs(t, err, &svcErr) {
 			assert.Equal(t, ErrCodeAuthAlreadyUsed, svcErr.Code)
+		}
+
+		mockTxRepo.AssertExpectations(t)
+	})
+
+	t.Run("authorization voided", func(t *testing.T) {
+		mockTxRepo := mocks.NewMockTransactionRepository(t)
+		mockAccountRepo := mocks.NewMockAccountRepository(t)
+		service := NewCaptureService(nil)
+		ctx := context.Background()
+
+		authID := uuid.New()
+
+		authTx := &models.Transaction{
+			ID:     authID,
+			Type:   models.TransactionTypeAuthHold,
+			Status: models.TransactionStatusVoided,
+		}
+
+		mockTxRepo.On("FindByIDForUpdate", ctx, authID).Return(authTx, nil)
+
+		result, err := service.performCapture(ctx, mockTxRepo, mockAccountRepo, authID, 10000)
+
+		assert.Error(t, err)
+		assert.Nil(t, result)
+
+		var svcErr *ServiceError
+		if assert.ErrorAs(t, err, &svcErr) {
+			assert.Equal(t, ErrCodeAlreadyVoided, svcErr.Code)
+		}
+
+		mockTxRepo.AssertExpectations(t)
+	})
+
+	t.Run("authorization status expired", func(t *testing.T) {
+		mockTxRepo := mocks.NewMockTransactionRepository(t)
+		mockAccountRepo := mocks.NewMockAccountRepository(t)
+		service := NewCaptureService(nil)
+		ctx := context.Background()
+
+		authID := uuid.New()
+
+		authTx := &models.Transaction{
+			ID:     authID,
+			Type:   models.TransactionTypeAuthHold,
+			Status: models.TransactionStatusExpired,
+		}
+
+		mockTxRepo.On("FindByIDForUpdate", ctx, authID).Return(authTx, nil)
+
+		result, err := service.performCapture(ctx, mockTxRepo, mockAccountRepo, authID, 10000)
+
+		assert.Error(t, err)
+		assert.Nil(t, result)
+
+		var svcErr *ServiceError
+		if assert.ErrorAs(t, err, &svcErr) {
+			assert.Equal(t, ErrCodeAuthExpired, svcErr.Code)
 		}
 
 		mockTxRepo.AssertExpectations(t)

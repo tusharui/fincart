@@ -25,7 +25,7 @@ func (h *Handler) CreateAuthorization(
 
 	return api.CreateAuthorization200JSONResponse{
 		AuthorizationId: formatAuthorizationID(txn.ID),
-		Status:          api.Approved,
+		Status:          api.AuthorizationResponseStatusApproved,
 		Amount:          txn.AmountCents,
 		Currency:        txn.Currency,
 		ExpiresAt:       *txn.ExpiresAt,
@@ -67,7 +67,7 @@ func (h *Handler) GetAuthorization(
 
 	return api.GetAuthorization200JSONResponse{
 		AuthorizationId: formatAuthorizationID(txn.ID),
-		Status:          api.Approved,
+		Status:          mapAuthorizationStatus(txn.Status),
 		Amount:          txn.AmountCents,
 		Currency:        txn.Currency,
 		ExpiresAt:       expiresAt,

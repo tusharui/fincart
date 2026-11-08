@@ -5,11 +5,11 @@ import (
 	"database/sql"
 	"testing"
 
-	"github.com/tusharui/payment-gateway/backend/internal/models"
-	"github.com/tusharui/payment-gateway/backend/internal/repository/mocks"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/tusharui/payment-gateway/backend/internal/models"
+	"github.com/tusharui/payment-gateway/backend/internal/repository/mocks"
 )
 
 func TestVoidService_PerformVoid(t *testing.T) {
@@ -35,7 +35,7 @@ func TestVoidService_PerformVoid(t *testing.T) {
 		mockTxRepo.On("FindByIDForUpdate", ctx, authID).Return(authTx, nil)
 		mockTxRepo.On("FindByReferenceID", ctx, authID, models.TransactionTypeCapture).Return(nil, nil)
 		mockTxRepo.On("Create", ctx, mock.AnythingOfType("*models.Transaction")).Return(nil)
-		mockTxRepo.On("UpdateStatus", ctx, authID, models.TransactionStatusCompleted).Return(nil)
+		mockTxRepo.On("UpdateStatus", ctx, authID, models.TransactionStatusVoided).Return(nil)
 		mockAccountRepo.On("AdjustBalances", ctx, accountID, int64(0), int64(10000)).Return(nil)
 
 		result, err := service.performVoid(ctx, mockTxRepo, mockAccountRepo, authID)
@@ -136,6 +136,64 @@ func TestVoidService_PerformVoid(t *testing.T) {
 		var svcErr *ServiceError
 		if assert.ErrorAs(t, err, &svcErr) {
 			assert.Equal(t, ErrCodeAuthAlreadyUsed, svcErr.Code)
+		}
+
+		mockTxRepo.AssertExpectations(t)
+	})
+
+	t.Run("authorization already voided", func(t *testing.T) {
+		mockTxRepo := mocks.NewMockTransactionRepository(t)
+		mockAccountRepo := mocks.NewMockAccountRepository(t)
+		service := NewVoidService(nil)
+		ctx := context.Background()
+
+		authID := uuid.New()
+
+		authTx := &models.Transaction{
+			ID:     authID,
+			Type:   models.TransactionTypeAuthHold,
+			Status: models.TransactionStatusVoided,
+		}
+
+		mockTxRepo.On("FindByIDForUpdate", ctx, authID).Return(authTx, nil)
+
+		result, err := service.performVoid(ctx, mockTxRepo, mockAccountRepo, authID)
+
+		assert.Error(t, err)
+		assert.Nil(t, result)
+
+		var svcErr *ServiceError
+		if assert.ErrorAs(t, err, &svcErr) {
+			assert.Equal(t, ErrCodeAlreadyVoided, svcErr.Code)
+		}
+
+		mockTxRepo.AssertExpectations(t)
+	})
+
+	t.Run("authorization expired", func(t *testing.T) {
+		mockTxRepo := mocks.NewMockTransactionRepository(t)
+		mockAccountRepo := mocks.NewMockAccountRepository(t)
+		service := NewVoidService(nil)
+		ctx := context.Background()
+
+		authID := uuid.New()
+
+		authTx := &models.Transaction{
+			ID:     authID,
+			Type:   models.TransactionTypeAuthHold,
+			Status: models.TransactionStatusExpired,
+		}
+
+		mockTxRepo.On("FindByIDForUpdate", ctx, authID).Return(authTx, nil)
+
+		result, err := service.performVoid(ctx, mockTxRepo, mockAccountRepo, authID)
+
+		assert.Error(t, err)
+		assert.Nil(t, result)
+
+		var svcErr *ServiceError
+		if assert.ErrorAs(t, err, &svcErr) {
+			assert.Equal(t, ErrCodeAuthExpired, svcErr.Code)
 		}
 
 		mockTxRepo.AssertExpectations(t)
@@ -276,7 +334,7 @@ func TestVoidService_PerformVoid(t *testing.T) {
 		mockTxRepo.On("FindByIDForUpdate", ctx, authID).Return(authTx, nil)
 		mockTxRepo.On("FindByReferenceID", ctx, authID, models.TransactionTypeCapture).Return(nil, nil)
 		mockTxRepo.On("Create", ctx, mock.AnythingOfType("*models.Transaction")).Return(nil)
-		mockTxRepo.On("UpdateStatus", ctx, authID, models.TransactionStatusCompleted).
+		mockTxRepo.On("UpdateStatus", ctx, authID, models.TransactionStatusVoided).
 			Return(assert.AnError)
 
 		result, err := service.performVoid(ctx, mockTxRepo, mockAccountRepo, authID)
@@ -313,7 +371,7 @@ func TestVoidService_PerformVoid(t *testing.T) {
 		mockTxRepo.On("FindByIDForUpdate", ctx, authID).Return(authTx, nil)
 		mockTxRepo.On("FindByReferenceID", ctx, authID, models.TransactionTypeCapture).Return(nil, nil)
 		mockTxRepo.On("Create", ctx, mock.AnythingOfType("*models.Transaction")).Return(nil)
-		mockTxRepo.On("UpdateStatus", ctx, authID, models.TransactionStatusCompleted).Return(nil)
+		mockTxRepo.On("UpdateStatus", ctx, authID, models.TransactionStatusVoided).Return(nil)
 		mockAccountRepo.On("AdjustBalances", ctx, accountID, int64(0), int64(10000)).
 			Return(assert.AnError)
 

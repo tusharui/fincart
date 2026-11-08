@@ -43,7 +43,7 @@ func TestCreateCapture_Success(t *testing.T) {
 	require.NoError(t, err)
 	successResp, ok := resp.(api.CreateCapture200JSONResponse)
 	require.True(t, ok)
-	assert.Equal(t, api.Captured, successResp.Status)
+	assert.Equal(t, api.CaptureResponseStatusCaptured, successResp.Status)
 }
 
 func TestCreateCapture_ServiceErrors(t *testing.T) {
@@ -140,6 +140,45 @@ func TestGetCapture_Success(t *testing.T) {
 	require.NoError(t, err)
 	_, ok := resp.(api.GetCapture200JSONResponse)
 	require.True(t, ok)
+}
+
+func TestGetCapture_StatusMapping(t *testing.T) {
+	tests := []struct {
+		name     string
+		status   models.TransactionStatus
+		expected api.CaptureResponseStatus
+	}{
+		{"completed maps to captured", models.TransactionStatusCompleted, api.CaptureResponseStatusCaptured},
+		{"refunded maps to refunded", models.TransactionStatusRefunded, api.CaptureResponseStatusRefunded},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockCapture := mocks.NewMockCapturer(t)
+			handler := NewHandler(nil, mockCapture, nil, nil, nil, testLogger())
+
+			authID := uuid.New()
+			captureID := uuid.New()
+			mockCapture.On("GetCapture", mock.Anything, captureID).
+				Return(&models.Transaction{
+					ID:          captureID,
+					ReferenceID: &authID,
+					AmountCents: 10000,
+					Currency:    "USD",
+					Status:      tt.status,
+					CreatedAt:   time.Now(),
+				}, nil)
+
+			resp, err := handler.GetCapture(context.Background(), api.GetCaptureRequestObject{
+				CaptureId: "cap_" + captureID.String(),
+			})
+
+			require.NoError(t, err)
+			typed, ok := resp.(api.GetCapture200JSONResponse)
+			require.True(t, ok)
+			assert.Equal(t, tt.expected, typed.Status)
+		})
+	}
 }
 
 func TestGetCapture_NotFound(t *testing.T) {

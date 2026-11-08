@@ -64,10 +64,7 @@ func (s *VoidService) performVoid(
 	}
 
 	if authTxn.Status != models.TransactionStatusActive {
-		return nil, &ServiceError{
-			Code:    ErrCodeAuthAlreadyUsed,
-			Message: "authorization has already been completed or cancelled",
-		}
+		return nil, authHoldStateError(authTxn.Status)
 	}
 
 	existingCapture, err := transactionRepo.FindByReferenceID(ctx, authorizationID, models.TransactionTypeCapture)
@@ -108,7 +105,7 @@ func (s *VoidService) performVoid(
 		return nil, fmt.Errorf("failed to create void: %w", err)
 	}
 
-	if err := transactionRepo.UpdateStatus(ctx, authorizationID, models.TransactionStatusCompleted); err != nil {
+	if err := transactionRepo.UpdateStatus(ctx, authorizationID, models.TransactionStatusVoided); err != nil {
 		return nil, &ServiceError{
 			Code:    ErrCodeInternalError,
 			Message: fmt.Sprintf("failed to update authorization: %v", err),
