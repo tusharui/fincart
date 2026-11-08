@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/tusharui/payment-gateway/backend/internal/models"
 	"github.com/tusharui/payment-gateway/backend/internal/security"
 )
 
@@ -221,7 +222,7 @@ func TestAccountRepository_AdjustBalances_Concurrent(t *testing.T) {
 	errCh := make(chan error, numGoroutines)
 	for i := 0; i < numGoroutines; i++ {
 		go func() {
-			errCh <- repo.AdjustBalances(context.Background(), account.ID, delta, 0)
+			errCh <- repo.AdjustBalances(context.Background(), account.ID, delta, delta)
 		}()
 	}
 
@@ -234,4 +235,73 @@ func TestAccountRepository_AdjustBalances_Concurrent(t *testing.T) {
 
 	expectedBalance := initialBalance + (numGoroutines * delta)
 	assert.Equal(t, expectedBalance, finalAccount.BalanceCents, "concurrent updates lost update detected!")
+	assert.Equal(t, expectedBalance, finalAccount.AvailableBalanceCents, "concurrent updates lost update detected!")
+}
+
+func TestAccountRepository_AdjustBalances_RejectsInvariantViolations(t *testing.T) {
+	database := setupTestDB(t)
+	defer cleanupTestDB(t, database)
+	truncateTables(t, database)
+
+	repo := NewAccountRepository(database.GORM())
+
+	account, setupErr := repo.FindByCardToken(context.Background(), security.HashToken("4111111111111111"))
+	require.NoError(t, setupErr, "failed to get existing account")
+
+	initialBalance := account.BalanceCents
+	initialAvailable := account.AvailableBalanceCents
+
+	tests := []struct {
+		name                  string
+		balanceDelta          int64
+		availableBalanceDelta int64
+	}{
+		{
+			name:                  "available balance would go negative",
+			balanceDelta:          0,
+			availableBalanceDelta: -initialAvailable - 1,
+		},
+		{
+			name:                  "balance would go negative",
+			balanceDelta:          -initialBalance - 1,
+			availableBalanceDelta: 0,
+		},
+		{
+			name:                  "available balance would exceed settled balance",
+			balanceDelta:          0,
+			availableBalanceDelta: initialBalance - initialAvailable + 1,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := repo.AdjustBalances(
+				context.Background(),
+				account.ID,
+				tt.balanceDelta,
+				tt.availableBalanceDelta,
+			)
+
+			require.Error(t, err)
+			assert.ErrorIs(t, err, models.ErrInsufficientFunds)
+
+			unchanged, err := repo.FindByID(context.Background(), account.ID)
+			require.NoError(t, err, "failed to reload account")
+			assert.Equal(t, initialBalance, unchanged.BalanceCents, "rejected adjustment must not change balance")
+			assert.Equal(t, initialAvailable, unchanged.AvailableBalanceCents, "rejected adjustment must not change available balance")
+		})
+	}
+
+	// A hold that exactly consumes the available balance is still allowed.
+	err := repo.AdjustBalances(context.Background(), account.ID, 0, -initialAvailable)
+	require.NoError(t, err)
+
+	afterHold, err := repo.FindByID(context.Background(), account.ID)
+	require.NoError(t, err)
+	assert.Equal(t, int64(0), afterHold.AvailableBalanceCents)
+
+	// Once nothing is available, another hold must be rejected.
+	err = repo.AdjustBalances(context.Background(), account.ID, 0, -1)
+	require.Error(t, err)
+	assert.ErrorIs(t, err, models.ErrInsufficientFunds)
 }

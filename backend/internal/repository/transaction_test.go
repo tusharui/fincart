@@ -61,7 +61,7 @@ func TestTransactionRepository_Create(t *testing.T) {
 				ID:          uuid.New(),
 				AccountID:   account.ID,
 				Type:        models.TransactionTypeVoid,
-				AmountCents: 0,
+				AmountCents: 1000,
 				Currency:    "USD",
 				Status:      models.TransactionStatusCompleted,
 			},

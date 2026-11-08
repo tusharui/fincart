@@ -114,6 +114,12 @@ func (s *CaptureService) performCapture(
 	}
 
 	if err := accountRepo.AdjustBalances(ctx, authTxn.AccountID, -amount, 0); err != nil {
+		if errors.Is(err, models.ErrInsufficientFunds) {
+			return nil, &ServiceError{
+				Code:    ErrCodeInsufficientFunds,
+				Message: "insufficient funds",
+			}
+		}
 		return nil, &ServiceError{
 			Code:    ErrCodeInternalError,
 			Message: fmt.Sprintf("failed to adjust balance: %v", err),

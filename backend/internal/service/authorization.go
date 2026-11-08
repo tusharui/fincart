@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"time"
 
@@ -118,6 +119,12 @@ func (s *AuthorizationService) performAuthorization(
 	}
 
 	if err := accountRepo.AdjustBalances(ctx, account.ID, 0, -amount); err != nil {
+		if errors.Is(err, models.ErrInsufficientFunds) {
+			return nil, &ServiceError{
+				Code:    ErrCodeInsufficientFunds,
+				Message: "insufficient funds",
+			}
+		}
 		return nil, &ServiceError{
 			Code:    ErrCodeInternalError,
 			Message: fmt.Sprintf("failed to adjust balance: %v", err),

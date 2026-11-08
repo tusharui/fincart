@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/tusharui/payment-gateway/backend/internal/models"
+	"github.com/tusharui/payment-gateway/backend/internal/security"
 	"github.com/tusharui/payment-gateway/backend/internal/service"
 )
 
@@ -513,4 +514,62 @@ func TestGetAuthorization_NotFound(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, http.StatusNotFound, resp.StatusCode)
 	resp.Body.Close()
+}
+
+func TestBalanceInvariantViolationRollsBackCaptureAndVoid(t *testing.T) {
+	ts := SetupTest(t)
+	defer ts.Close()
+
+	authResp := ts.Authorize(t, "4111111111111111", "123", 10000, "invariant-auth-key")
+	require.Equal(t, http.StatusOK, authResp.StatusCode)
+
+	var authBody map[string]any
+	require.NoError(t, json.NewDecoder(authResp.Body).Decode(&authBody))
+	authResp.Body.Close()
+
+	formattedID := authBody["authorization_id"].(string)
+	authID, err := uuid.Parse(strings.TrimPrefix(formattedID, "auth_"))
+	require.NoError(t, err)
+
+	// Simulate out-of-band tampering that leaves the account with no settled
+	// funds while a hold is still active. The balance guard must refuse to move
+	// either balance, and the whole transaction must roll back.
+	require.NoError(t, ts.Database.GORM().
+		Model(&models.Account{}).
+		Where("card_token = ?", security.HashToken("4111111111111111")).
+		Updates(map[string]any{
+			"balance_cents":           0,
+			"available_balance_cents": 0,
+		}).Error)
+
+	captureResp := ts.Capture(t, formattedID, 10000, "invariant-capture-key")
+	require.Equal(t, http.StatusBadRequest, captureResp.StatusCode)
+
+	var captureBody map[string]any
+	require.NoError(t, json.NewDecoder(captureResp.Body).Decode(&captureBody))
+	captureResp.Body.Close()
+	assert.Equal(t, "insufficient_funds", captureBody["error"])
+
+	voidResp := ts.Void(t, formattedID, "invariant-void-key")
+	require.Equal(t, http.StatusInternalServerError, voidResp.StatusCode)
+	voidResp.Body.Close()
+
+	// Neither attempt may leave a ledger row or change the authorization.
+	var authTxn models.Transaction
+	require.NoError(t, ts.Database.GORM().First(&authTxn, "id = ?", authID).Error)
+	assert.Equal(t, models.TransactionStatusActive, authTxn.Status)
+
+	var ledgerCount int64
+	require.NoError(t, ts.Database.GORM().
+		Model(&models.Transaction{}).
+		Where("reference_id = ?", authID).
+		Count(&ledgerCount).Error)
+	assert.Equal(t, int64(0), ledgerCount, "failed capture/void must not leave ledger rows")
+
+	var account models.Account
+	require.NoError(t, ts.Database.GORM().
+		Where("card_token = ?", security.HashToken("4111111111111111")).
+		First(&account).Error)
+	assert.Equal(t, int64(0), account.BalanceCents)
+	assert.Equal(t, int64(0), account.AvailableBalanceCents)
 }

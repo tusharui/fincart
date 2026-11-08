@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"testing"
 	"time"
 
@@ -374,6 +375,44 @@ func TestCaptureService_PerformCapture(t *testing.T) {
 		var svcErr *ServiceError
 		if assert.ErrorAs(t, err, &svcErr) {
 			assert.Equal(t, ErrCodeInternalError, svcErr.Code)
+		}
+
+		mockTxRepo.AssertExpectations(t)
+		mockAccountRepo.AssertExpectations(t)
+	})
+
+	t.Run("balance guard rejects capture", func(t *testing.T) {
+		mockTxRepo := mocks.NewMockTransactionRepository(t)
+		mockAccountRepo := mocks.NewMockAccountRepository(t)
+		service := NewCaptureService(nil)
+		ctx := context.Background()
+
+		authID := uuid.New()
+		accountID := uuid.New()
+		var amount int64 = 10000
+
+		authTx := &models.Transaction{
+			ID:          authID,
+			AccountID:   accountID,
+			Type:        models.TransactionTypeAuthHold,
+			AmountCents: amount,
+			Status:      models.TransactionStatusActive,
+		}
+
+		mockTxRepo.On("FindByIDForUpdate", ctx, authID).Return(authTx, nil)
+		mockTxRepo.On("Create", ctx, mock.AnythingOfType("*models.Transaction")).Return(nil)
+		mockTxRepo.On("UpdateStatus", ctx, authID, models.TransactionStatusCompleted).Return(nil)
+		mockAccountRepo.On("AdjustBalances", ctx, accountID, int64(-10000), int64(0)).
+			Return(fmt.Errorf("guard: %w", models.ErrInsufficientFunds))
+
+		result, err := service.performCapture(ctx, mockTxRepo, mockAccountRepo, authID, amount)
+
+		assert.Error(t, err)
+		assert.Nil(t, result)
+
+		var svcErr *ServiceError
+		if assert.ErrorAs(t, err, &svcErr) {
+			assert.Equal(t, ErrCodeInsufficientFunds, svcErr.Code)
 		}
 
 		mockTxRepo.AssertExpectations(t)

@@ -9,4 +9,9 @@ var (
 
 	// ErrNotFound indicates the requested entity was not found
 	ErrNotFound = errors.New("not found")
+
+	// ErrInsufficientFunds indicates that a balance adjustment would violate a
+	// money invariant (a negative balance or available funds above the settled
+	// balance).
+	ErrInsufficientFunds = errors.New("insufficient funds")
 )

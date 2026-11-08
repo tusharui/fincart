@@ -80,10 +80,19 @@ func (r *accountRepository) FindByCardTokenForUpdate(ctx context.Context, cardTo
 }
 
 // AdjustBalances atomically adjusts the balance and available balance by the given deltas.
+//
+// The money invariants (non-negative balances, available never above settled)
+// are enforced in the UPDATE itself so concurrent adjustments cannot interleave
+// between a read and a write. When no row is updated we check whether the
+// account exists so callers can distinguish a missing account from an
+// adjustment that would break an invariant.
 func (r *accountRepository) AdjustBalances(ctx context.Context, accountID uuid.UUID, balanceDelta, availableBalanceDelta int64) error {
 	result := r.db.WithContext(ctx).
 		Model(&models.Account{}).
 		Where("id = ?", accountID).
+		Where("balance_cents + ? >= 0", balanceDelta).
+		Where("available_balance_cents + ? >= 0", availableBalanceDelta).
+		Where("available_balance_cents + ? <= balance_cents + ?", availableBalanceDelta, balanceDelta).
 		Updates(map[string]any{
 			"balance_cents":           gorm.Expr("balance_cents + ?", balanceDelta),
 			"available_balance_cents": gorm.Expr("available_balance_cents + ?", availableBalanceDelta),
@@ -92,9 +101,32 @@ func (r *accountRepository) AdjustBalances(ctx context.Context, accountID uuid.U
 	if result.Error != nil {
 		return fmt.Errorf("failed to adjust account balances: %w", result.Error)
 	}
-	if result.RowsAffected == 0 {
+	if result.RowsAffected > 0 {
+		return nil
+	}
+
+	exists, err := r.accountExists(ctx, accountID)
+	if err != nil {
+		return fmt.Errorf("failed to check account existence: %w", err)
+	}
+	if !exists {
 		return fmt.Errorf("account not found")
 	}
 
-	return nil
+	return fmt.Errorf("balance adjustment would violate money invariants: %w", models.ErrInsufficientFunds)
+}
+
+// accountExists reports whether an account row is present. It is used only to
+// classify a zero-row balance update.
+func (r *accountRepository) accountExists(ctx context.Context, accountID uuid.UUID) (bool, error) {
+	var count int64
+	err := r.db.WithContext(ctx).
+		Model(&models.Account{}).
+		Where("id = ?", accountID).
+		Count(&count).Error
+	if err != nil {
+		return false, err
+	}
+
+	return count > 0, nil
 }
