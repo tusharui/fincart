@@ -42,6 +42,15 @@ type TestServer struct {
 func SetupTest(t *testing.T) *TestServer {
 	t.Helper()
 
+	return SetupTestWithConfig(t, nil)
+}
+
+// SetupTestWithConfig creates a test server after applying mutate to the loaded
+// configuration. Security tests use it to opt into rate limiting or to disable
+// authentication without changing the shared harness defaults.
+func SetupTestWithConfig(t *testing.T, mutate func(*config.Config)) *TestServer {
+	t.Helper()
+
 	cfg, err := config.Load()
 	require.NoError(t, err, "failed to load config")
 
@@ -53,6 +62,10 @@ func SetupTest(t *testing.T) *TestServer {
 	// Integration tests burst many requests from a single key. Rate limiting is
 	// covered by its own tests, so the shared harness opts out.
 	cfg.RateLimit.Enabled = false
+
+	if mutate != nil {
+		mutate(cfg)
+	}
 
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 
