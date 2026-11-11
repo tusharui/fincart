@@ -4,6 +4,7 @@ import (
 	"log/slog"
 	"net/http"
 
+	"github.com/google/uuid"
 	"github.com/tusharui/payment-gateway/backend/internal/api"
 	"github.com/tusharui/payment-gateway/backend/internal/config"
 	"github.com/tusharui/payment-gateway/backend/internal/db"
@@ -48,7 +49,9 @@ func NewRouter(
 
 	finalHandler = middleware.FailureInjection(&cfg.App, logger)(finalHandler)
 
-	idempotencyRepo := repository.NewIdempotencyRepository(database.GORM())
+	idempotencyRepo := func(merchantID uuid.UUID) middleware.IdempotencyRepository {
+		return repository.NewIdempotencyRepository(database.GORM(), merchantID)
+	}
 	finalHandler = middleware.Idempotency(idempotencyRepo, logger)(finalHandler)
 	finalHandler = middleware.APIKeyAuth(apiKeyService, cfg.Auth.Enabled, logger)(finalHandler)
 

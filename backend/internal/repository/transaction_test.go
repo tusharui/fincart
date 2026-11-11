@@ -17,8 +17,8 @@ func TestTransactionRepository_Create(t *testing.T) {
 	defer cleanupTestDB(t, database)
 	truncateTables(t, database)
 
-	repo := NewTransactionRepository(database.GORM())
-	accountRepo := NewAccountRepository(database.GORM())
+	repo := NewTransactionRepository(database.GORM(), models.DefaultMerchantID)
+	accountRepo := NewAccountRepository(database.GORM(), models.DefaultMerchantID)
 
 	account, err := accountRepo.FindByCardToken(context.Background(), security.HashToken("4111111111111111"))
 	require.NoError(t, err, "failed to get account")
@@ -106,8 +106,8 @@ func TestTransactionRepository_FindByID(t *testing.T) {
 	defer cleanupTestDB(t, database)
 	truncateTables(t, database)
 
-	repo := NewTransactionRepository(database.GORM())
-	accountRepo := NewAccountRepository(database.GORM())
+	repo := NewTransactionRepository(database.GORM(), models.DefaultMerchantID)
+	accountRepo := NewAccountRepository(database.GORM(), models.DefaultMerchantID)
 
 	account, err := accountRepo.FindByCardToken(context.Background(), security.HashToken("4111111111111111"))
 	require.NoError(t, err, "failed to get account")
@@ -159,8 +159,8 @@ func TestTransactionRepository_FindByReferenceID(t *testing.T) {
 	defer cleanupTestDB(t, database)
 	truncateTables(t, database)
 
-	repo := NewTransactionRepository(database.GORM())
-	accountRepo := NewAccountRepository(database.GORM())
+	repo := NewTransactionRepository(database.GORM(), models.DefaultMerchantID)
+	accountRepo := NewAccountRepository(database.GORM(), models.DefaultMerchantID)
 
 	account, err := accountRepo.FindByCardToken(context.Background(), security.HashToken("4111111111111111"))
 	require.NoError(t, err, "failed to get account")
@@ -234,8 +234,8 @@ func TestTransactionRepository_FindExpiredAuthorizations(t *testing.T) {
 	defer cleanupTestDB(t, database)
 	truncateTables(t, database)
 
-	repo := NewTransactionRepository(database.GORM())
-	accountRepo := NewAccountRepository(database.GORM())
+	repo := NewTransactionRepository(database.GORM(), models.DefaultMerchantID)
+	accountRepo := NewAccountRepository(database.GORM(), models.DefaultMerchantID)
 	ctx := context.Background()
 
 	account, err := accountRepo.FindByCardToken(ctx, security.HashToken("4111111111111111"))
@@ -325,8 +325,8 @@ func TestTransactionRepository_UpdateStatus(t *testing.T) {
 	defer cleanupTestDB(t, database)
 	truncateTables(t, database)
 
-	repo := NewTransactionRepository(database.GORM())
-	accountRepo := NewAccountRepository(database.GORM())
+	repo := NewTransactionRepository(database.GORM(), models.DefaultMerchantID)
+	accountRepo := NewAccountRepository(database.GORM(), models.DefaultMerchantID)
 
 	account, err := accountRepo.FindByCardToken(context.Background(), security.HashToken("4111111111111111"))
 	require.NoError(t, err, "failed to get account")

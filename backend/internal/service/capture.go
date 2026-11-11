@@ -29,10 +29,15 @@ func NewCaptureService(database *db.DB) *CaptureService {
 
 // Capture captures an authorized payment
 func (s *CaptureService) Capture(ctx context.Context, authorizationID uuid.UUID, amount int64) (*models.Transaction, error) {
+	merchantID, err := merchantIDFrom(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	var captureTxn *models.Transaction
-	err := s.db.GORM().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		transactionRepo := repository.NewTransactionRepository(tx)
-		accountRepo := repository.NewAccountRepository(tx)
+	err = s.db.GORM().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		transactionRepo := repository.NewTransactionRepository(tx, merchantID)
+		accountRepo := repository.NewAccountRepository(tx, merchantID)
 
 		result, err := s.performCapture(ctx, transactionRepo, accountRepo, authorizationID, amount)
 		if err != nil {
@@ -134,7 +139,12 @@ func (s *CaptureService) performCapture(
 
 // GetCapture retrieves a capture by ID
 func (s *CaptureService) GetCapture(ctx context.Context, captureID uuid.UUID) (*models.Transaction, error) {
-	repo := repository.NewTransactionRepository(s.db.GORM())
+	merchantID, err := merchantIDFrom(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	repo := repository.NewTransactionRepository(s.db.GORM(), merchantID)
 	txn, err := repo.FindByID(ctx, captureID)
 	if err != nil || txn.Type != models.TransactionTypeCapture {
 		return nil, &ServiceError{

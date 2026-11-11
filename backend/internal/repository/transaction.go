@@ -25,21 +25,30 @@ type TransactionRepository interface {
 
 // transactionRepository implements TransactionRepository using GORM.
 type transactionRepository struct {
-	db *gorm.DB
+	db         *gorm.DB
+	merchantID uuid.UUID
 }
 
-// NewTransactionRepository creates a new TransactionRepository.
-// Passing a transactional *gorm.DB lets the repository participate in an
-// enclosing transaction without changing its API.
-func NewTransactionRepository(db *gorm.DB) TransactionRepository {
-	return &transactionRepository{db: db}
+// NewTransactionRepository creates a new TransactionRepository bound to a
+// merchant. Passing a transactional *gorm.DB lets the repository participate in
+// an enclosing transaction without changing its API.
+func NewTransactionRepository(db *gorm.DB, merchantID uuid.UUID) TransactionRepository {
+	return &transactionRepository{db: db, merchantID: merchantID}
 }
 
-// Create inserts a new transaction into the database.
+// scoped returns a query filtered to the repository's merchant.
+func (r *transactionRepository) scoped(ctx context.Context) *gorm.DB {
+	return r.db.WithContext(ctx).Where("merchant_id = ?", r.merchantID)
+}
+
+// Create inserts a new transaction into the database. Ownership is stamped from
+// the repository binding so a caller cannot write a ledger entry for a
+// different merchant.
 func (r *transactionRepository) Create(ctx context.Context, tx *models.Transaction) error {
 	if tx.ID == uuid.Nil {
 		tx.ID = uuid.New()
 	}
+	tx.MerchantID = r.merchantID
 
 	if err := r.db.WithContext(ctx).Create(tx).Error; err != nil {
 		if db.IsUniqueViolation(err) || errors.Is(err, gorm.ErrDuplicatedKey) {
@@ -51,10 +60,10 @@ func (r *transactionRepository) Create(ctx context.Context, tx *models.Transacti
 	return nil
 }
 
-// FindByID retrieves a transaction by its ID.
+// FindByID retrieves one of the merchant's transactions by its ID.
 func (r *transactionRepository) FindByID(ctx context.Context, id uuid.UUID) (*models.Transaction, error) {
 	var tx models.Transaction
-	err := r.db.WithContext(ctx).First(&tx, "id = ?", id).Error
+	err := r.scoped(ctx).First(&tx, "id = ?", id).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, fmt.Errorf("transaction not found: %w", err)
 	}
@@ -65,11 +74,12 @@ func (r *transactionRepository) FindByID(ctx context.Context, id uuid.UUID) (*mo
 	return &tx, nil
 }
 
-// FindByIDForUpdate retrieves a transaction by ID with a row-level lock.
-// It must be called inside a transaction so the lock is held until commit/rollback.
+// FindByIDForUpdate retrieves one of the merchant's transactions by ID with a
+// row-level lock. It must be called inside a transaction so the lock is held
+// until commit/rollback.
 func (r *transactionRepository) FindByIDForUpdate(ctx context.Context, id uuid.UUID) (*models.Transaction, error) {
 	var tx models.Transaction
-	err := r.db.WithContext(ctx).
+	err := r.scoped(ctx).
 		Clauses(clause.Locking{Strength: clause.LockingStrengthUpdate}).
 		First(&tx, "id = ?", id).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -82,12 +92,12 @@ func (r *transactionRepository) FindByIDForUpdate(ctx context.Context, id uuid.U
 	return &tx, nil
 }
 
-// FindByReferenceID finds a transaction by its reference_id and type.
-// This is used to check if a capture/void/refund already exists for an
+// FindByReferenceID finds one of the merchant's transactions by its reference_id
+// and type. This is used to check if a capture/void/refund already exists for an
 // authorization/capture. A missing row returns (nil, nil).
 func (r *transactionRepository) FindByReferenceID(ctx context.Context, refID uuid.UUID, txnType models.TransactionType) (*models.Transaction, error) {
 	var tx models.Transaction
-	err := r.db.WithContext(ctx).
+	err := r.scoped(ctx).
 		Where("reference_id = ? AND type = ?", refID, txnType).
 		First(&tx).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -104,6 +114,11 @@ func (r *transactionRepository) FindByReferenceID(ctx context.Context, refID uui
 // time has passed, in stable ID order. Pass a zero UUID for the first page;
 // subsequent pages use the last ID from the previous page. The limit is capped
 // to a sane default when non-positive.
+//
+// This is the entry point for the system-wide expiry sweep, so it intentionally
+// ignores the repository's tenant binding and returns rows for every merchant.
+// The sweep then performs each row's state change through a repository bound to
+// that row's merchant.
 func (r *transactionRepository) FindExpiredAuthorizations(ctx context.Context, now time.Time, afterID uuid.UUID, limit int) ([]models.Transaction, error) {
 	if limit <= 0 {
 		limit = 500
@@ -123,9 +138,9 @@ func (r *transactionRepository) FindExpiredAuthorizations(ctx context.Context, n
 	return txs, nil
 }
 
-// UpdateStatus updates the status of a transaction.
+// UpdateStatus updates the status of one of the merchant's transactions.
 func (r *transactionRepository) UpdateStatus(ctx context.Context, id uuid.UUID, status models.TransactionStatus) error {
-	result := r.db.WithContext(ctx).
+	result := r.scoped(ctx).
 		Model(&models.Transaction{}).
 		Where("id = ?", id).
 		Update("status", status)

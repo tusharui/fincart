@@ -127,19 +127,19 @@ func resetTestData(t *testing.T, database *db.DB) (map[uuid.UUID]int64, string) 
 
 	accounts := []models.Account{
 		{
-			ID: uuid.New(), CardToken: security.HashToken("4111111111111111"), Last4: "1111",
+			ID: uuid.New(), MerchantID: models.DefaultMerchantID, CardToken: security.HashToken("4111111111111111"), Last4: "1111",
 			ExpiryMonth: 12, ExpiryYear: 2030, BalanceCents: 1000000, AvailableBalanceCents: 1000000,
 		},
 		{
-			ID: uuid.New(), CardToken: security.HashToken("4242424242424242"), Last4: "4242",
+			ID: uuid.New(), MerchantID: models.DefaultMerchantID, CardToken: security.HashToken("4242424242424242"), Last4: "4242",
 			ExpiryMonth: 6, ExpiryYear: 2030, BalanceCents: 50000, AvailableBalanceCents: 50000,
 		},
 		{
-			ID: uuid.New(), CardToken: security.HashToken("5555555555554444"), Last4: "4444",
+			ID: uuid.New(), MerchantID: models.DefaultMerchantID, CardToken: security.HashToken("5555555555554444"), Last4: "4444",
 			ExpiryMonth: 9, ExpiryYear: 2030, BalanceCents: 0, AvailableBalanceCents: 0,
 		},
 		{
-			ID: uuid.New(), CardToken: security.HashToken("5105105105105100"), Last4: "5100",
+			ID: uuid.New(), MerchantID: models.DefaultMerchantID, CardToken: security.HashToken("5105105105105100"), Last4: "5100",
 			ExpiryMonth: 3, ExpiryYear: 2020, BalanceCents: 500000, AvailableBalanceCents: 500000,
 		},
 	}

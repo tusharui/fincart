@@ -12,7 +12,9 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/google/uuid"
 	"github.com/tusharui/payment-gateway/backend/internal/api"
+	"github.com/tusharui/payment-gateway/backend/internal/auth"
 	"github.com/tusharui/payment-gateway/backend/internal/models"
 	"github.com/tusharui/payment-gateway/backend/internal/respond"
 )
@@ -70,13 +72,18 @@ func (rc *responseCapture) Write(b []byte) (int, error) {
 	return rc.ResponseWriter.Write(b)
 }
 
+// IdempotencyRepositoryFactory returns an idempotency repository bound to a
+// merchant. A request-scoped repository keeps client-chosen keys isolated
+// between tenants without threading the merchant through every call.
+type IdempotencyRepositoryFactory func(merchantID uuid.UUID) IdempotencyRepository
+
 // Idempotency creates middleware that handles idempotent request caching.
 //
 // A key is claimed before the request executes, which prevents two concurrent
 // requests with the same key from both being processed. Cached responses are
 // bound to a hash of the request body, so reusing a key with a different
 // payload is rejected instead of silently replaying an unrelated response.
-func Idempotency(repo IdempotencyRepository, logger *slog.Logger) func(http.Handler) http.Handler {
+func Idempotency(factory IdempotencyRepositoryFactory, logger *slog.Logger) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if !requiresIdempotency(r) {
@@ -114,6 +121,15 @@ func Idempotency(repo IdempotencyRepository, logger *slog.Logger) func(http.Hand
 					"failed to read request body")
 				return
 			}
+
+			merchantID, ok := auth.MerchantIDFrom(r.Context())
+			if !ok {
+				// Authentication middleware always sets a principal on payment
+				// routes; reaching this point means the route was wired wrong.
+				writeUnauthorized(w)
+				return
+			}
+			repo := factory(merchantID)
 
 			requestPath := normalizeRequestPath(r.URL.Path)
 			requestHash := hashRequestBody(body)

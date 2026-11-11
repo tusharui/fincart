@@ -29,10 +29,15 @@ func NewRefundService(database *db.DB) *RefundService {
 
 // Refund refunds a captured payment
 func (s *RefundService) Refund(ctx context.Context, captureID uuid.UUID, amount int64) (*models.Transaction, error) {
+	merchantID, err := merchantIDFrom(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	var refundTxn *models.Transaction
-	err := s.db.GORM().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		transactionRepo := repository.NewTransactionRepository(tx)
-		accountRepo := repository.NewAccountRepository(tx)
+	err = s.db.GORM().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		transactionRepo := repository.NewTransactionRepository(tx, merchantID)
+		accountRepo := repository.NewAccountRepository(tx, merchantID)
 
 		result, err := s.performRefund(ctx, transactionRepo, accountRepo, captureID, amount)
 		if err != nil {
@@ -132,7 +137,12 @@ func (s *RefundService) performRefund(
 
 // GetRefund retrieves a refund by ID
 func (s *RefundService) GetRefund(ctx context.Context, refundID uuid.UUID) (*models.Transaction, error) {
-	repo := repository.NewTransactionRepository(s.db.GORM())
+	merchantID, err := merchantIDFrom(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	repo := repository.NewTransactionRepository(s.db.GORM(), merchantID)
 	txn, err := repo.FindByID(ctx, refundID)
 	if err != nil || txn.Type != models.TransactionTypeRefund {
 		return nil, &ServiceError{

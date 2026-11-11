@@ -23,20 +23,27 @@ type AccountRepository interface {
 
 // accountRepository implements AccountRepository using GORM.
 type accountRepository struct {
-	db *gorm.DB
+	db         *gorm.DB
+	merchantID uuid.UUID
 }
 
-// NewAccountRepository creates a new AccountRepository.
-// Passing a transactional *gorm.DB lets the repository participate in an
-// enclosing transaction without changing its API.
-func NewAccountRepository(db *gorm.DB) AccountRepository {
-	return &accountRepository{db: db}
+// NewAccountRepository creates a new AccountRepository bound to a merchant.
+// Every read and write is scoped to that tenant, so callers cannot accidentally
+// address another merchant's account. Passing a transactional *gorm.DB lets the
+// repository participate in an enclosing transaction without changing its API.
+func NewAccountRepository(db *gorm.DB, merchantID uuid.UUID) AccountRepository {
+	return &accountRepository{db: db, merchantID: merchantID}
 }
 
-// FindByID retrieves an account by its UUID.
+// scoped returns a query filtered to the repository's merchant.
+func (r *accountRepository) scoped(ctx context.Context) *gorm.DB {
+	return r.db.WithContext(ctx).Where("merchant_id = ?", r.merchantID)
+}
+
+// FindByID retrieves an account owned by the bound merchant.
 func (r *accountRepository) FindByID(ctx context.Context, id uuid.UUID) (*models.Account, error) {
 	var account models.Account
-	err := r.db.WithContext(ctx).First(&account, "id = ?", id).Error
+	err := r.scoped(ctx).First(&account, "id = ?", id).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, fmt.Errorf("account not found: %w", err)
 	}
@@ -47,10 +54,10 @@ func (r *accountRepository) FindByID(ctx context.Context, id uuid.UUID) (*models
 	return &account, nil
 }
 
-// FindByCardToken retrieves an account by its card token.
+// FindByCardToken retrieves a merchant's account by its card token.
 func (r *accountRepository) FindByCardToken(ctx context.Context, cardToken string) (*models.Account, error) {
 	var account models.Account
-	err := r.db.WithContext(ctx).Where("card_token = ?", cardToken).First(&account).Error
+	err := r.scoped(ctx).Where("card_token = ?", cardToken).First(&account).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, fmt.Errorf("account not found: %w", err)
 	}
@@ -61,11 +68,12 @@ func (r *accountRepository) FindByCardToken(ctx context.Context, cardToken strin
 	return &account, nil
 }
 
-// FindByCardTokenForUpdate retrieves an account by its card token with a row-level lock.
-// It must be called inside a transaction so the lock is held until commit/rollback.
+// FindByCardTokenForUpdate retrieves a merchant's account by its card token with
+// a row-level lock. It must be called inside a transaction so the lock is held
+// until commit/rollback.
 func (r *accountRepository) FindByCardTokenForUpdate(ctx context.Context, cardToken string) (*models.Account, error) {
 	var account models.Account
-	err := r.db.WithContext(ctx).
+	err := r.scoped(ctx).
 		Clauses(clause.Locking{Strength: clause.LockingStrengthUpdate}).
 		Where("card_token = ?", cardToken).
 		First(&account).Error
@@ -87,7 +95,7 @@ func (r *accountRepository) FindByCardTokenForUpdate(ctx context.Context, cardTo
 // account exists so callers can distinguish a missing account from an
 // adjustment that would break an invariant.
 func (r *accountRepository) AdjustBalances(ctx context.Context, accountID uuid.UUID, balanceDelta, availableBalanceDelta int64) error {
-	result := r.db.WithContext(ctx).
+	result := r.scoped(ctx).
 		Model(&models.Account{}).
 		Where("id = ?", accountID).
 		Where("balance_cents + ? >= 0", balanceDelta).
@@ -120,7 +128,7 @@ func (r *accountRepository) AdjustBalances(ctx context.Context, accountID uuid.U
 // classify a zero-row balance update.
 func (r *accountRepository) accountExists(ctx context.Context, accountID uuid.UUID) (bool, error) {
 	var count int64
-	err := r.db.WithContext(ctx).
+	err := r.scoped(ctx).
 		Model(&models.Account{}).
 		Where("id = ?", accountID).
 		Count(&count).Error

@@ -43,7 +43,9 @@ func (s *ExpiryService) ExpireAuthorizations(ctx context.Context, now time.Time)
 		cursor  uuid.UUID
 	)
 
-	repo := repository.NewTransactionRepository(s.db.GORM())
+	// The sweep entry point is intentionally cross-tenant; each row's merchant
+	// is used for the follow-up work below.
+	repo := repository.NewTransactionRepository(s.db.GORM(), uuid.Nil)
 	for {
 		batch, err := repo.FindExpiredAuthorizations(ctx, now, cursor, expirySweepBatchSize)
 		if err != nil {
@@ -57,7 +59,7 @@ func (s *ExpiryService) ExpireAuthorizations(ctx context.Context, now time.Time)
 		for _, auth := range batch {
 			cursor = auth.ID
 
-			didExpire, err := s.expireOne(ctx, auth.ID, now)
+			didExpire, err := s.expireOne(ctx, auth.MerchantID, auth.ID, now)
 			if err != nil {
 				errs = append(errs, err)
 				continue
@@ -77,12 +79,12 @@ func (s *ExpiryService) ExpireAuthorizations(ctx context.Context, now time.Time)
 
 // expireOne expires a single authorization inside its own transaction so the
 // status update and balance release commit together.
-func (s *ExpiryService) expireOne(ctx context.Context, authID uuid.UUID, now time.Time) (bool, error) {
+func (s *ExpiryService) expireOne(ctx context.Context, merchantID, authID uuid.UUID, now time.Time) (bool, error) {
 	var expired bool
 
 	err := s.db.GORM().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		transactionRepo := repository.NewTransactionRepository(tx)
-		accountRepo := repository.NewAccountRepository(tx)
+		transactionRepo := repository.NewTransactionRepository(tx, merchantID)
+		accountRepo := repository.NewAccountRepository(tx, merchantID)
 
 		didExpire, err := s.expireAuthorization(ctx, transactionRepo, accountRepo, authID, now)
 		if err != nil {

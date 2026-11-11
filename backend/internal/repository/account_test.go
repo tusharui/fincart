@@ -16,7 +16,7 @@ func TestAccountRepository_FindByCardToken(t *testing.T) {
 	defer cleanupTestDB(t, database)
 	truncateTables(t, database)
 
-	repo := NewAccountRepository(database.GORM())
+	repo := NewAccountRepository(database.GORM(), models.DefaultMerchantID)
 
 	tests := []struct {
 		name      string
@@ -62,7 +62,7 @@ func TestAccountRepository_FindByID(t *testing.T) {
 	defer cleanupTestDB(t, database)
 	truncateTables(t, database)
 
-	repo := NewAccountRepository(database.GORM())
+	repo := NewAccountRepository(database.GORM(), models.DefaultMerchantID)
 
 	existingAccount, setupErr := repo.FindByCardToken(context.Background(), security.HashToken("4111111111111111"))
 	require.NoError(t, setupErr, "failed to get existing account")
@@ -104,7 +104,7 @@ func TestAccountRepository_AdjustBalances(t *testing.T) {
 	defer cleanupTestDB(t, database)
 	truncateTables(t, database)
 
-	repo := NewAccountRepository(database.GORM())
+	repo := NewAccountRepository(database.GORM(), models.DefaultMerchantID)
 
 	account, setupErr := repo.FindByCardToken(context.Background(), security.HashToken("4111111111111111"))
 	require.NoError(t, setupErr, "failed to get existing account")
@@ -209,7 +209,7 @@ func TestAccountRepository_AdjustBalances_Concurrent(t *testing.T) {
 	defer cleanupTestDB(t, database)
 	truncateTables(t, database)
 
-	repo := NewAccountRepository(database.GORM())
+	repo := NewAccountRepository(database.GORM(), models.DefaultMerchantID)
 
 	account, setupErr := repo.FindByCardToken(context.Background(), security.HashToken("4111111111111111"))
 	require.NoError(t, setupErr, "failed to get account")
@@ -243,7 +243,7 @@ func TestAccountRepository_AdjustBalances_RejectsInvariantViolations(t *testing.
 	defer cleanupTestDB(t, database)
 	truncateTables(t, database)
 
-	repo := NewAccountRepository(database.GORM())
+	repo := NewAccountRepository(database.GORM(), models.DefaultMerchantID)
 
 	account, setupErr := repo.FindByCardToken(context.Background(), security.HashToken("4111111111111111"))
 	require.NoError(t, setupErr, "failed to get existing account")

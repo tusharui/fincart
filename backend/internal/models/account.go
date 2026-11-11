@@ -11,6 +11,7 @@ import (
 // Raw PAN and CVV are never persisted; only the provider token and last4 are stored.
 type Account struct {
 	ID                    uuid.UUID `db:"id" gorm:"column:id;primaryKey"`
+	MerchantID            uuid.UUID `db:"merchant_id" gorm:"column:merchant_id;not null"`
 	CardToken             string    `db:"card_token" gorm:"column:card_token"`
 	Last4                 string    `db:"last4" gorm:"column:last4"`
 	ExpiryMonth           int       `db:"expiry_month" gorm:"column:expiry_month"`

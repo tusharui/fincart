@@ -17,6 +17,7 @@ const (
 // It is written in the same transaction as the ledger mutation it describes.
 type PaymentEvent struct {
 	ID            uuid.UUID  `db:"id" gorm:"column:id;primaryKey"`
+	MerchantID    uuid.UUID  `db:"merchant_id" gorm:"column:merchant_id;not null"`
 	Type          string     `db:"type" gorm:"column:type;not null"`
 	AggregateType string     `db:"aggregate_type" gorm:"column:aggregate_type;not null"`
 	AggregateID   uuid.UUID  `db:"aggregate_id" gorm:"column:aggregate_id;not null"`

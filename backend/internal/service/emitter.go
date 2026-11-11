@@ -46,6 +46,7 @@ func emitPaymentEventAt(
 	repo := repository.NewEventRepository(tx)
 	if err := repo.Create(ctx, &models.PaymentEvent{
 		ID:            event.ID,
+		MerchantID:    event.MerchantID,
 		Type:          event.Type,
 		AggregateType: "payment",
 		AggregateID:   event.TransactionID,

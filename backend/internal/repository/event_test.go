@@ -13,6 +13,7 @@ import (
 
 func newTestEvent(eventType string, nextAttempt time.Time) *models.PaymentEvent {
 	return &models.PaymentEvent{
+		MerchantID:    models.DefaultMerchantID,
 		Type:          eventType,
 		AggregateType: "payment",
 		AggregateID:   uuid.New(),

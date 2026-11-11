@@ -32,6 +32,7 @@ const (
 // Transaction represents a ledger entry for account activity
 type Transaction struct {
 	ID          uuid.UUID         `db:"id" gorm:"column:id;primaryKey"`
+	MerchantID  uuid.UUID         `db:"merchant_id" gorm:"column:merchant_id;not null"`
 	AccountID   uuid.UUID         `db:"account_id" gorm:"column:account_id"`
 	OrderID     *uuid.UUID        `db:"order_id" gorm:"column:order_id"`
 	CustomerID  *uuid.UUID        `db:"customer_id" gorm:"column:customer_id"`
@@ -51,6 +52,7 @@ const IdempotencyStatusPending = 0
 
 // IdempotencyKey tracks processed requests to prevent duplicate transactions
 type IdempotencyKey struct {
+	MerchantID     uuid.UUID `db:"merchant_id" gorm:"column:merchant_id"`
 	Key            string    `db:"key" gorm:"column:key"`
 	RequestPath    string    `db:"request_path" gorm:"column:request_path"`
 	RequestHash    string    `db:"request_hash" gorm:"column:request_hash"`

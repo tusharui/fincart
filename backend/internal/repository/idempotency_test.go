@@ -15,7 +15,7 @@ func TestIdempotencyRepository_ClaimCompleteAndGet(t *testing.T) {
 	defer cleanupTestDB(t, database)
 	truncateTables(t, database)
 
-	repo := NewIdempotencyRepository(database.GORM())
+	repo := NewIdempotencyRepository(database.GORM(), models.DefaultMerchantID)
 	ctx := context.Background()
 
 	tests := []struct {
@@ -77,7 +77,7 @@ func TestIdempotencyRepository_Get_NotFound(t *testing.T) {
 	defer cleanupTestDB(t, database)
 	truncateTables(t, database)
 
-	repo := NewIdempotencyRepository(database.GORM())
+	repo := NewIdempotencyRepository(database.GORM(), models.DefaultMerchantID)
 
 	result, err := repo.Get(context.Background(), "non-existent-key", "/api/v1/test")
 	require.NoError(t, err, "unexpected error")
@@ -89,7 +89,7 @@ func TestIdempotencyRepository_Claim_Conflict(t *testing.T) {
 	defer cleanupTestDB(t, database)
 	truncateTables(t, database)
 
-	repo := NewIdempotencyRepository(database.GORM())
+	repo := NewIdempotencyRepository(database.GORM(), models.DefaultMerchantID)
 	ctx := context.Background()
 
 	key := "duplicate-key"
@@ -114,7 +114,7 @@ func TestIdempotencyRepository_Complete_OnlyOwnerCanComplete(t *testing.T) {
 	defer cleanupTestDB(t, database)
 	truncateTables(t, database)
 
-	repo := NewIdempotencyRepository(database.GORM())
+	repo := NewIdempotencyRepository(database.GORM(), models.DefaultMerchantID)
 	ctx := context.Background()
 
 	key := "owner-key"
@@ -142,7 +142,7 @@ func TestIdempotencyRepository_Release(t *testing.T) {
 	defer cleanupTestDB(t, database)
 	truncateTables(t, database)
 
-	repo := NewIdempotencyRepository(database.GORM())
+	repo := NewIdempotencyRepository(database.GORM(), models.DefaultMerchantID)
 	ctx := context.Background()
 
 	key := "release-key"
@@ -169,7 +169,7 @@ func TestIdempotencyRepository_Release_DoesNotRemoveCompleted(t *testing.T) {
 	defer cleanupTestDB(t, database)
 	truncateTables(t, database)
 
-	repo := NewIdempotencyRepository(database.GORM())
+	repo := NewIdempotencyRepository(database.GORM(), models.DefaultMerchantID)
 	ctx := context.Background()
 
 	key := "completed-key"
@@ -196,7 +196,7 @@ func TestIdempotencyRepository_Claim_TakesOverStalePending(t *testing.T) {
 	defer cleanupTestDB(t, database)
 	truncateTables(t, database)
 
-	repo := NewIdempotencyRepository(database.GORM())
+	repo := NewIdempotencyRepository(database.GORM(), models.DefaultMerchantID)
 	ctx := context.Background()
 
 	key := "stale-key"
@@ -227,7 +227,7 @@ func TestIdempotencyRepository_SameKey_DifferentPath(t *testing.T) {
 	defer cleanupTestDB(t, database)
 	truncateTables(t, database)
 
-	repo := NewIdempotencyRepository(database.GORM())
+	repo := NewIdempotencyRepository(database.GORM(), models.DefaultMerchantID)
 	ctx := context.Background()
 
 	key := "same-key"
@@ -256,7 +256,7 @@ func TestIdempotencyRepository_DeleteOlderThan(t *testing.T) {
 	defer cleanupTestDB(t, database)
 	truncateTables(t, database)
 
-	repo := NewIdempotencyRepository(database.GORM())
+	repo := NewIdempotencyRepository(database.GORM(), models.DefaultMerchantID)
 	ctx := context.Background()
 
 	now := time.Now()
@@ -296,7 +296,7 @@ func TestIdempotencyRepository_DeleteOlderThan_NoneDeleted(t *testing.T) {
 	defer cleanupTestDB(t, database)
 	truncateTables(t, database)
 
-	repo := NewIdempotencyRepository(database.GORM())
+	repo := NewIdempotencyRepository(database.GORM(), models.DefaultMerchantID)
 	ctx := context.Background()
 
 	acquired, err := repo.Claim(ctx, "recent-key", "/api/v1/test", "recent-hash")

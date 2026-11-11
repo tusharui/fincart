@@ -10,10 +10,12 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/tusharui/payment-gateway/backend/internal/api"
+	"github.com/tusharui/payment-gateway/backend/internal/auth"
 	"github.com/tusharui/payment-gateway/backend/internal/models"
 	"github.com/tusharui/payment-gateway/backend/internal/service/mocks"
 )
@@ -48,12 +50,23 @@ func newIdempotentRequest(t *testing.T, path, key, body string) *http.Request {
 		req.Header.Set("Idempotency-Key", key)
 	}
 
+	// Authentication runs before idempotency in production, so requests always
+	// carry a merchant by the time the repository is resolved.
+	principal := auth.Principal{MerchantID: models.DefaultMerchantID, Scopes: []string{models.ScopePayments}}
+	req = req.WithContext(auth.WithPrincipal(req.Context(), principal))
+
 	return req
+}
+
+// testRepoFactory binds a single mock repository to every merchant. Tests only
+// exercise one tenant, so the merchant argument is ignored.
+func testRepoFactory(repo IdempotencyRepository) IdempotencyRepositoryFactory {
+	return func(uuid.UUID) IdempotencyRepository { return repo }
 }
 
 func TestIdempotency_GETRequestsBypassed(t *testing.T) {
 	repo := mocks.NewMockIdempotencyRepository(t)
-	middleware := Idempotency(repo, testLogger())
+	middleware := Idempotency(testRepoFactory(repo), testLogger())
 
 	handlerCalled := false
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -74,7 +87,7 @@ func TestIdempotency_GETRequestsBypassed(t *testing.T) {
 
 func TestIdempotency_NonIdempotentPathBypassed(t *testing.T) {
 	repo := mocks.NewMockIdempotencyRepository(t)
-	middleware := Idempotency(repo, testLogger())
+	middleware := Idempotency(testRepoFactory(repo), testLogger())
 
 	handlerCalled := false
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -95,7 +108,7 @@ func TestIdempotency_NonIdempotentPathBypassed(t *testing.T) {
 
 func TestIdempotency_MissingKeyPassesThrough(t *testing.T) {
 	repo := mocks.NewMockIdempotencyRepository(t)
-	middleware := Idempotency(repo, testLogger())
+	middleware := Idempotency(testRepoFactory(repo), testLogger())
 
 	handlerCalled := false
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -116,7 +129,7 @@ func TestIdempotency_MissingKeyPassesThrough(t *testing.T) {
 
 func TestIdempotency_KeyTooLongRejected(t *testing.T) {
 	repo := mocks.NewMockIdempotencyRepository(t)
-	middleware := Idempotency(repo, testLogger())
+	middleware := Idempotency(testRepoFactory(repo), testLogger())
 
 	handlerCalled := false
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -137,7 +150,7 @@ func TestIdempotency_KeyTooLongRejected(t *testing.T) {
 
 func TestIdempotency_BodyTooLargeRejected(t *testing.T) {
 	repo := mocks.NewMockIdempotencyRepository(t)
-	middleware := Idempotency(repo, testLogger())
+	middleware := Idempotency(testRepoFactory(repo), testLogger())
 
 	handlerCalled := false
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -170,7 +183,7 @@ func TestIdempotency_FirstRequestClaimedAndCached(t *testing.T) {
 	repo.On("Claim", mock.Anything, key, path, hashRequestBody([]byte(body))).Return(true, nil)
 	repo.On("Complete", mock.Anything, key, path, hashRequestBody([]byte(body)), http.StatusOK, resp).Return(nil)
 
-	middleware := Idempotency(repo, testLogger())
+	middleware := Idempotency(testRepoFactory(repo), testLogger())
 	handler := testHandler(http.StatusOK, resp)
 
 	rec := httptest.NewRecorder()
@@ -202,7 +215,7 @@ func TestIdempotency_SecondRequestReturnsCached(t *testing.T) {
 	repo := mocks.NewMockIdempotencyRepository(t)
 	repo.On("Get", mock.Anything, key, path).Return(cached, nil)
 
-	middleware := Idempotency(repo, testLogger())
+	middleware := Idempotency(testRepoFactory(repo), testLogger())
 
 	callCount := 0
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -238,7 +251,7 @@ func TestIdempotency_LegacyCacheEntryWithoutHashIsReplayed(t *testing.T) {
 	repo := mocks.NewMockIdempotencyRepository(t)
 	repo.On("Get", mock.Anything, key, path).Return(cached, nil)
 
-	middleware := Idempotency(repo, testLogger())
+	middleware := Idempotency(testRepoFactory(repo), testLogger())
 	handler := testHandler(http.StatusInternalServerError, `{"should":"not run"}`)
 
 	rec := httptest.NewRecorder()
@@ -265,7 +278,7 @@ func TestIdempotency_KeyReuseWithDifferentBodyRejected(t *testing.T) {
 	repo := mocks.NewMockIdempotencyRepository(t)
 	repo.On("Get", mock.Anything, key, path).Return(cached, nil)
 
-	middleware := Idempotency(repo, testLogger())
+	middleware := Idempotency(testRepoFactory(repo), testLogger())
 
 	handlerCalled := false
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -297,7 +310,7 @@ func TestIdempotency_PendingClaimReturnsConflict(t *testing.T) {
 	repo := mocks.NewMockIdempotencyRepository(t)
 	repo.On("Get", mock.Anything, key, path).Return(cached, nil)
 
-	middleware := Idempotency(repo, testLogger())
+	middleware := Idempotency(testRepoFactory(repo), testLogger())
 
 	rec := httptest.NewRecorder()
 	middleware(testHandler(http.StatusOK, `{}`)).ServeHTTP(rec, newIdempotentRequest(t, path, key, body))
@@ -326,7 +339,7 @@ func TestIdempotency_LostClaimRaceReplaysWinnerResponse(t *testing.T) {
 	repo.On("Get", mock.Anything, key, path).Return(cached, nil).Once()
 	repo.On("Claim", mock.Anything, key, path, mock.Anything).Return(false, nil)
 
-	middleware := Idempotency(repo, testLogger())
+	middleware := Idempotency(testRepoFactory(repo), testLogger())
 
 	handlerCalled := false
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -353,7 +366,7 @@ func TestIdempotency_LostClaimRaceWithoutResultReturnsConflict(t *testing.T) {
 	repo.On("Get", mock.Anything, key, path).Return(nil, nil).Twice()
 	repo.On("Claim", mock.Anything, key, path, mock.Anything).Return(false, nil)
 
-	middleware := Idempotency(repo, testLogger())
+	middleware := Idempotency(testRepoFactory(repo), testLogger())
 
 	rec := httptest.NewRecorder()
 	middleware(testHandler(http.StatusOK, `{}`)).ServeHTTP(rec, newIdempotentRequest(t, path, key, body))
@@ -371,7 +384,7 @@ func TestIdempotency_RepoGetErrorFailsClosed(t *testing.T) {
 	repo := mocks.NewMockIdempotencyRepository(t)
 	repo.On("Get", mock.Anything, key, path).Return(nil, errors.New("database connection failed"))
 
-	middleware := Idempotency(repo, testLogger())
+	middleware := Idempotency(testRepoFactory(repo), testLogger())
 
 	handlerCalled := false
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -396,7 +409,7 @@ func TestIdempotency_ClaimErrorFailsClosed(t *testing.T) {
 	repo.On("Get", mock.Anything, key, path).Return(nil, nil)
 	repo.On("Claim", mock.Anything, key, path, mock.Anything).Return(false, errors.New("insert failed"))
 
-	middleware := Idempotency(repo, testLogger())
+	middleware := Idempotency(testRepoFactory(repo), testLogger())
 
 	rec := httptest.NewRecorder()
 	middleware(testHandler(http.StatusOK, `{}`)).ServeHTTP(rec, newIdempotentRequest(t, path, key, `{"amount":100}`))
@@ -417,7 +430,7 @@ func TestIdempotency_5xxResponsesAreReleasedNotCached(t *testing.T) {
 	repo.On("Claim", mock.Anything, key, path, hashRequestBody([]byte(body))).Return(true, nil)
 	repo.On("Release", mock.Anything, key, path, hashRequestBody([]byte(body))).Return(nil)
 
-	middleware := Idempotency(repo, testLogger())
+	middleware := Idempotency(testRepoFactory(repo), testLogger())
 	handler := testHandler(http.StatusInternalServerError, `{"error":"server error"}`)
 
 	rec := httptest.NewRecorder()
@@ -440,7 +453,7 @@ func TestIdempotency_4xxResponsesAreReleasedNotCached(t *testing.T) {
 	repo.On("Claim", mock.Anything, key, path, hashRequestBody([]byte(body))).Return(true, nil)
 	repo.On("Release", mock.Anything, key, path, hashRequestBody([]byte(body))).Return(nil)
 
-	middleware := Idempotency(repo, testLogger())
+	middleware := Idempotency(testRepoFactory(repo), testLogger())
 	handler := testHandler(http.StatusBadRequest, `{"error":"bad request"}`)
 
 	rec := httptest.NewRecorder()
@@ -465,7 +478,7 @@ func TestIdempotency_CompleteErrorDoesNotAffectResponse(t *testing.T) {
 	repo.On("Complete", mock.Anything, key, path, hashRequestBody([]byte(body)), http.StatusOK, resp).
 		Return(errors.New("failed to store"))
 
-	middleware := Idempotency(repo, testLogger())
+	middleware := Idempotency(testRepoFactory(repo), testLogger())
 	handler := testHandler(http.StatusOK, resp)
 
 	rec := httptest.NewRecorder()
@@ -496,7 +509,7 @@ func TestIdempotency_RequestBodyIsRestoredForHandler(t *testing.T) {
 		_, _ = w.Write(read) //nolint:errcheck // test helper
 	})
 
-	middleware := Idempotency(repo, testLogger())
+	middleware := Idempotency(testRepoFactory(repo), testLogger())
 	rec := httptest.NewRecorder()
 	middleware(handler).ServeHTTP(rec, newIdempotentRequest(t, path, key, body))
 
@@ -524,7 +537,7 @@ func TestIdempotency_AllIdempotentPaths(t *testing.T) {
 			repo.On("Claim", mock.Anything, key, path, hashRequestBody([]byte(body))).Return(true, nil)
 			repo.On("Complete", mock.Anything, key, path, mock.Anything, http.StatusOK, mock.Anything).Return(nil)
 
-			middleware := Idempotency(repo, testLogger())
+			middleware := Idempotency(testRepoFactory(repo), testLogger())
 			handler := testHandler(http.StatusOK, `{"status":"ok"}`)
 
 			rec := httptest.NewRecorder()
@@ -548,7 +561,7 @@ func TestIdempotency_SameKeyDifferentPathsAreSeparate(t *testing.T) {
 	repo.On("Complete", mock.Anything, key, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(nil)
 
-	middleware := Idempotency(repo, testLogger())
+	middleware := Idempotency(testRepoFactory(repo), testLogger())
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -584,11 +597,38 @@ func TestIdempotency_TrailingSlashIsNormalized(t *testing.T) {
 	repo := mocks.NewMockIdempotencyRepository(t)
 	repo.On("Get", mock.Anything, key, "/api/v1/authorizations").Return(cached, nil)
 
-	middleware := Idempotency(repo, testLogger())
+	middleware := Idempotency(testRepoFactory(repo), testLogger())
 	rec := httptest.NewRecorder()
 	middleware(testHandler(http.StatusOK, `{}`)).ServeHTTP(rec,
 		newIdempotentRequest(t, "/api/v1/authorizations/", key, body))
 
 	assert.Equal(t, http.StatusOK, rec.Code)
 	assert.Equal(t, `{"cached":true}`, rec.Body.String())
+}
+
+func TestIdempotency_MissingMerchantIsUnauthorized(t *testing.T) {
+	repo := mocks.NewMockIdempotencyRepository(t)
+	factoryCalled := false
+	factory := func(uuid.UUID) IdempotencyRepository {
+		factoryCalled = true
+		return repo
+	}
+
+	handlerCalled := false
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		handlerCalled = true
+		w.WriteHeader(http.StatusOK)
+	})
+
+	// No principal in the context: the route was wired without authentication.
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/authorizations", strings.NewReader(`{}`))
+	req.Header.Set("Idempotency-Key", "unowned-key")
+	rec := httptest.NewRecorder()
+
+	Idempotency(factory, testLogger())(handler).ServeHTTP(rec, req)
+
+	assert.False(t, handlerCalled, "handler must not run without an owning merchant")
+	assert.False(t, factoryCalled, "no repository should be resolved without a merchant")
+	assert.Equal(t, http.StatusUnauthorized, rec.Code)
+	assert.Equal(t, string(api.ErrorCodeUnauthorized), responseErrorCode(t, rec))
 }

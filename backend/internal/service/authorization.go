@@ -48,10 +48,15 @@ func (s *AuthorizationService) Authorize(ctx context.Context, request Authorizat
 		return nil, err
 	}
 
+	merchantID, err := merchantIDFrom(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	var authTx *models.Transaction
-	err := s.db.GORM().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		accountRepo := repository.NewAccountRepository(tx)
-		transactionRepo := repository.NewTransactionRepository(tx)
+	err = s.db.GORM().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		accountRepo := repository.NewAccountRepository(tx, merchantID)
+		transactionRepo := repository.NewTransactionRepository(tx, merchantID)
 
 		result, err := s.performAuthorization(ctx, accountRepo, transactionRepo, request)
 		if err != nil {
@@ -147,7 +152,12 @@ func (s *AuthorizationService) performAuthorization(
 
 // GetAuthorization retrieves an authorization by ID
 func (s *AuthorizationService) GetAuthorization(ctx context.Context, authID uuid.UUID) (*models.Transaction, error) {
-	repo := repository.NewTransactionRepository(s.db.GORM())
+	merchantID, err := merchantIDFrom(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	repo := repository.NewTransactionRepository(s.db.GORM(), merchantID)
 	txn, err := repo.FindByID(ctx, authID)
 	if err != nil || txn.Type != models.TransactionTypeAuthHold {
 		return nil, &ServiceError{

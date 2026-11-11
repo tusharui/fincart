@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/tusharui/payment-gateway/backend/internal/models"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -27,19 +28,27 @@ type IdempotencyRepository interface {
 
 // idempotencyRepository implements IdempotencyRepository using GORM.
 type idempotencyRepository struct {
-	db *gorm.DB
+	db         *gorm.DB
+	merchantID uuid.UUID
 }
 
-// NewIdempotencyRepository creates a new IdempotencyRepository.
-func NewIdempotencyRepository(db *gorm.DB) IdempotencyRepository {
-	return &idempotencyRepository{db: db}
+// NewIdempotencyRepository creates a new IdempotencyRepository bound to a
+// merchant. Client-chosen keys are only unique inside a tenant, so every
+// request-path lookup is scoped to the merchant that owns it.
+func NewIdempotencyRepository(db *gorm.DB, merchantID uuid.UUID) IdempotencyRepository {
+	return &idempotencyRepository{db: db, merchantID: merchantID}
+}
+
+// scoped returns a query filtered to the repository's merchant.
+func (r *idempotencyRepository) scoped(ctx context.Context) *gorm.DB {
+	return r.db.WithContext(ctx).Where("merchant_id = ?", r.merchantID)
 }
 
 // Get retrieves a cached idempotency key and its response.
 // A missing key returns (nil, nil), meaning this is a new request.
 func (r *idempotencyRepository) Get(ctx context.Context, key, requestPath string) (*models.IdempotencyKey, error) {
 	var idemKey models.IdempotencyKey
-	err := r.db.WithContext(ctx).
+	err := r.scoped(ctx).
 		Where("key = ? AND request_path = ?", key, requestPath).
 		First(&idemKey).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -60,6 +69,7 @@ func (r *idempotencyRepository) Get(ctx context.Context, key, requestPath string
 // crashed request cannot block the key forever.
 func (r *idempotencyRepository) Claim(ctx context.Context, key, requestPath, requestHash string) (bool, error) {
 	claim := &models.IdempotencyKey{
+		MerchantID:     r.merchantID,
 		Key:            key,
 		RequestPath:    requestPath,
 		RequestHash:    requestHash,
@@ -79,7 +89,7 @@ func (r *idempotencyRepository) Claim(ctx context.Context, key, requestPath, req
 	}
 
 	cutoff := time.Now().Add(-idempotencyReservationTTL)
-	takeover := r.db.WithContext(ctx).
+	takeover := r.scoped(ctx).
 		Model(&models.IdempotencyKey{}).
 		Where("key = ? AND request_path = ? AND request_hash = ? AND response_status = ? AND created_at < ?",
 			key, requestPath, requestHash, models.IdempotencyStatusPending, cutoff).
@@ -98,7 +108,7 @@ func (r *idempotencyRepository) Complete(
 	responseStatus int,
 	responseBody string,
 ) error {
-	result := r.db.WithContext(ctx).
+	result := r.scoped(ctx).
 		Model(&models.IdempotencyKey{}).
 		Where("key = ? AND request_path = ? AND request_hash = ? AND response_status = ?",
 			key, requestPath, requestHash, models.IdempotencyStatusPending).
@@ -119,7 +129,7 @@ func (r *idempotencyRepository) Complete(
 // Release removes a pending claim so the request can be retried.
 // It only deletes the claim when it is still pending and owned by requestHash.
 func (r *idempotencyRepository) Release(ctx context.Context, key, requestPath, requestHash string) error {
-	result := r.db.WithContext(ctx).
+	result := r.scoped(ctx).
 		Where("key = ? AND request_path = ? AND request_hash = ? AND response_status = ?",
 			key, requestPath, requestHash, models.IdempotencyStatusPending).
 		Delete(&models.IdempotencyKey{})
@@ -131,7 +141,8 @@ func (r *idempotencyRepository) Release(ctx context.Context, key, requestPath, r
 }
 
 // DeleteOlderThan removes idempotency keys created before the specified time.
-// This is used for cleanup of keys older than 24 hours.
+// This is a maintenance operation that deliberately spans every merchant, so it
+// is not constrained by the repository's tenant binding.
 func (r *idempotencyRepository) DeleteOlderThan(ctx context.Context, before time.Time) (int64, error) {
 	result := r.db.WithContext(ctx).
 		Where("created_at < ?", before).

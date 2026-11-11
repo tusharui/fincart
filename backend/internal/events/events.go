@@ -28,6 +28,7 @@ const SchemaVersion = 1
 // Event is the envelope delivered to webhook endpoints.
 type Event struct {
 	ID            uuid.UUID   `json:"id"`
+	MerchantID    uuid.UUID   `json:"merchant_id"`
 	Type          string      `json:"type"`
 	SchemaVersion int         `json:"schema_version"`
 	TransactionID uuid.UUID   `json:"transaction_id"`
@@ -93,6 +94,7 @@ func ForTransactionAt(eventType string, txn *models.Transaction, occurredAt time
 
 	return Event{
 		ID:            uuid.New(),
+		MerchantID:    txn.MerchantID,
 		Type:          eventType,
 		SchemaVersion: SchemaVersion,
 		TransactionID: txn.ID,

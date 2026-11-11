@@ -29,10 +29,15 @@ func NewVoidService(database *db.DB) *VoidService {
 
 // Void cancels an authorization before it's captured
 func (s *VoidService) Void(ctx context.Context, authorizationID uuid.UUID) (*models.Transaction, error) {
+	merchantID, err := merchantIDFrom(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	var voidTxn *models.Transaction
-	err := s.db.GORM().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		transactionRepo := repository.NewTransactionRepository(tx)
-		accountRepo := repository.NewAccountRepository(tx)
+	err = s.db.GORM().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		transactionRepo := repository.NewTransactionRepository(tx, merchantID)
+		accountRepo := repository.NewAccountRepository(tx, merchantID)
 
 		result, err := s.performVoid(ctx, transactionRepo, accountRepo, authorizationID)
 		if err != nil {

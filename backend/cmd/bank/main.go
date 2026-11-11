@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/joho/godotenv"
 	"github.com/tusharui/payment-gateway/backend/internal/config"
 	"github.com/tusharui/payment-gateway/backend/internal/db"
@@ -174,7 +175,8 @@ func configureAuth(ctx context.Context, cfg *config.Config, database *db.DB, log
 // cleanupIdempotencyKeys removes idempotency keys older than 24 hours
 func cleanupIdempotencyKeys(ctx context.Context, database *db.DB, logger *slog.Logger) {
 	cutoffTime := time.Now().Add(-24 * time.Hour)
-	repo := repository.NewIdempotencyRepository(database.GORM())
+	// Cleanup spans every tenant, so the merchant binding is irrelevant here.
+	repo := repository.NewIdempotencyRepository(database.GORM(), uuid.Nil)
 	rowsDeleted, err := repo.DeleteOlderThan(ctx, cutoffTime)
 	if err != nil {
 		logger.Warn("failed to cleanup old idempotency keys", "error", err)
