@@ -31,7 +31,11 @@ paths:
   /health:
     get:
       operationId: getHealth
-      summary: Health check
+      summary: Liveness check
+      description: |
+        Reports that the process is running and able to serve HTTP. It does not
+        check downstream dependencies, so an unhealthy database does not cause
+        the orchestrator to restart a healthy process.
       tags: [Health]
       responses:
         '200':
@@ -46,6 +50,29 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HealthResponse'
+
+  /ready:
+    get:
+      operationId: getReady
+      summary: Readiness check
+      description: |
+        Reports whether the service can accept traffic. Readiness fails when the
+        database is unreachable so load balancers stop routing to this instance
+        until the dependency recovers.
+      tags: [Health]
+      responses:
+        '200':
+          description: Service is ready to accept traffic
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReadinessResponse'
+        '503':
+          description: Service is not ready
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReadinessResponse'
 
   /api/v1/authorizations:
     post:
@@ -290,6 +317,14 @@ components:
         status:
           type: string
           enum: [healthy, unhealthy]
+
+    ReadinessResponse:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [ready, not_ready]
 
     ErrorResponse:
       type: object

@@ -38,9 +38,12 @@ type ServerInterface interface {
 	// Void authorization
 	// (POST /api/v1/voids)
 	CreateVoid(w http.ResponseWriter, r *http.Request, params CreateVoidParams)
-	// Health check
+	// Liveness check
 	// (GET /health)
 	GetHealth(w http.ResponseWriter, r *http.Request)
+	// Readiness check
+	// (GET /ready)
+	GetReady(w http.ResponseWriter, r *http.Request)
 }
 
 // ServerInterfaceWrapper converts contexts to parameters.
@@ -317,6 +320,20 @@ func (siw *ServerInterfaceWrapper) GetHealth(w http.ResponseWriter, r *http.Requ
 	handler.ServeHTTP(w, r)
 }
 
+// GetReady operation middleware
+func (siw *ServerInterfaceWrapper) GetReady(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetReady(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 type UnescapedCookieParamError struct {
 	ParamName string
 	Err       error
@@ -445,6 +462,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc("GET "+options.BaseURL+"/api/v1/refunds/{refundId}", wrapper.GetRefund)
 	m.HandleFunc("POST "+options.BaseURL+"/api/v1/voids", wrapper.CreateVoid)
 	m.HandleFunc("GET "+options.BaseURL+"/health", wrapper.GetHealth)
+	m.HandleFunc("GET "+options.BaseURL+"/ready", wrapper.GetReady)
 
 	return m
 }
@@ -854,6 +872,31 @@ func (response GetHealth503JSONResponse) VisitGetHealthResponse(w http.ResponseW
 	return json.NewEncoder(w).Encode(response)
 }
 
+type GetReadyRequestObject struct {
+}
+
+type GetReadyResponseObject interface {
+	VisitGetReadyResponse(w http.ResponseWriter) error
+}
+
+type GetReady200JSONResponse ReadinessResponse
+
+func (response GetReady200JSONResponse) VisitGetReadyResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetReady503JSONResponse ReadinessResponse
+
+func (response GetReady503JSONResponse) VisitGetReadyResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(503)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
 	// Create authorization hold
@@ -877,9 +920,12 @@ type StrictServerInterface interface {
 	// Void authorization
 	// (POST /api/v1/voids)
 	CreateVoid(ctx context.Context, request CreateVoidRequestObject) (CreateVoidResponseObject, error)
-	// Health check
+	// Liveness check
 	// (GET /health)
 	GetHealth(ctx context.Context, request GetHealthRequestObject) (GetHealthResponseObject, error)
+	// Readiness check
+	// (GET /ready)
+	GetReady(ctx context.Context, request GetReadyRequestObject) (GetReadyResponseObject, error)
 }
 
 type StrictHandlerFunc = strictnethttp.StrictHTTPHandlerFunc
@@ -1138,6 +1184,30 @@ func (sh *strictHandler) GetHealth(w http.ResponseWriter, r *http.Request) {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetHealthResponseObject); ok {
 		if err := validResponse.VisitGetHealthResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetReady operation middleware
+func (sh *strictHandler) GetReady(w http.ResponseWriter, r *http.Request) {
+	var request GetReadyRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetReady(ctx, request.(GetReadyRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetReady")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetReadyResponseObject); ok {
+		if err := validResponse.VisitGetReadyResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

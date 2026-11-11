@@ -55,6 +55,12 @@ const (
 	Unhealthy HealthResponseStatus = "unhealthy"
 )
 
+// Defines values for ReadinessResponseStatus.
+const (
+	NotReady ReadinessResponseStatus = "not_ready"
+	Ready    ReadinessResponseStatus = "ready"
+)
+
 // Defines values for RefundResponseStatus.
 const (
 	Refunded RefundResponseStatus = "refunded"
@@ -163,6 +169,14 @@ type HealthResponse struct {
 
 // HealthResponseStatus defines model for HealthResponse.Status.
 type HealthResponseStatus string
+
+// ReadinessResponse defines model for ReadinessResponse.
+type ReadinessResponse struct {
+	Status ReadinessResponseStatus `json:"status"`
+}
+
+// ReadinessResponseStatus defines model for ReadinessResponse.Status.
+type ReadinessResponseStatus string
 
 // RefundResponse defines model for RefundResponse.
 type RefundResponse struct {
