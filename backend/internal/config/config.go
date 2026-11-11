@@ -46,6 +46,9 @@ type DatabaseConfig struct {
 
 // AppConfig holds application-specific configuration
 type AppConfig struct {
+	// ChaosEnabled gates failure and latency injection. It defaults to false
+	// so a production deployment cannot accidentally return synthetic errors.
+	ChaosEnabled       bool
 	FailureRate        float64
 	MinLatencyMS       int
 	MaxLatencyMS       int
@@ -96,9 +99,10 @@ func Load() (*Config, error) {
 			ConnMaxLifetime: getEnvAsDuration("DB_CONN_MAX_LIFETIME", "5m"),
 		},
 		App: AppConfig{
-			FailureRate:        getEnvAsFloat("FAILURE_RATE", 0.05),
-			MinLatencyMS:       getEnvAsInt("MIN_LATENCY_MS", 100),
-			MaxLatencyMS:       getEnvAsInt("MAX_LATENCY_MS", 2000),
+			ChaosEnabled:       getEnvAsBool("CHAOS_ENABLED", false),
+			FailureRate:        getEnvAsFloat("FAILURE_RATE", 0),
+			MinLatencyMS:       getEnvAsInt("MIN_LATENCY_MS", 0),
+			MaxLatencyMS:       getEnvAsInt("MAX_LATENCY_MS", 0),
 			AuthExpiryHours:    authExpiryHours,
 			AuthExpiryDuration: time.Duration(authExpiryHours) * time.Hour,
 		},

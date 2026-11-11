@@ -20,12 +20,36 @@ type chaosErrorResponse struct {
 
 var excludedPaths = []string{
 	"/health",
+	"/ready",
+	"/metrics",
 	"/docs",
 }
 
 // FailureInjection creates middleware that injects latency and random failures
 // for testing resilience of client applications.
+//
+// Injection is opt-in via CHAOS_ENABLED. With chaos disabled the middleware is a
+// pass-through, even if stale latency or failure-rate settings are present, so a
+// misconfigured production deployment cannot return synthetic errors.
 func FailureInjection(cfg *config.AppConfig, logger *slog.Logger) func(http.Handler) http.Handler {
+	if !cfg.ChaosEnabled {
+		if cfg.FailureRate > 0 || cfg.MinLatencyMS > 0 || cfg.MaxLatencyMS > 0 {
+			logger.Warn("failure injection settings ignored because chaos is disabled",
+				"hint", "set CHAOS_ENABLED=true to enable synthetic failures and latency",
+			)
+		}
+
+		return func(next http.Handler) http.Handler {
+			return next
+		}
+	}
+
+	logger.Warn("failure injection enabled",
+		"failure_rate", cfg.FailureRate,
+		"min_latency_ms", cfg.MinLatencyMS,
+		"max_latency_ms", cfg.MaxLatencyMS,
+	)
+
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if isExcludedPath(r.URL.Path) {

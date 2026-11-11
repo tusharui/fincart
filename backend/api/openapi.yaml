@@ -7,8 +7,10 @@ info:
     This mock Bank API provides basic functionality to test payment flows without real money transactions.
 
     All POST endpoints require an Idempotency-Key header.
-    5% of requests will randomly fail with 500 errors.
-    All requests have injected latency between 100-2000ms.
+
+    Failure injection (synthetic 500s and added latency) is disabled by default.
+    Set CHAOS_ENABLED=true to opt in, then configure FAILURE_RATE,
+    MIN_LATENCY_MS, and MAX_LATENCY_MS.
   version: 1.0.0
 
 servers:

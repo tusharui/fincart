@@ -36,6 +36,9 @@ services:
       DB_NAME: mockbank
       DB_SSLMODE: disable
       PORT: 8080
+      # The compose stack is a demo environment: keep the deliberately flaky
+      # bank behavior explicit. Production defaults are off.
+      CHAOS_ENABLED: "true"
       FAILURE_RATE: 0.05
       MIN_LATENCY_MS: 100
       MAX_LATENCY_MS: 2000

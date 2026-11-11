@@ -95,6 +95,36 @@ func TestWebhookConfig_Validate(t *testing.T) {
 	}
 }
 
+func TestLoad_ChaosDefaultsToDisabled(t *testing.T) {
+	t.Setenv("CHAOS_ENABLED", "")
+	t.Setenv("FAILURE_RATE", "")
+	t.Setenv("MIN_LATENCY_MS", "")
+	t.Setenv("MAX_LATENCY_MS", "")
+
+	cfg, err := Load()
+	require.NoError(t, err)
+
+	assert.False(t, cfg.App.ChaosEnabled)
+	assert.Zero(t, cfg.App.FailureRate)
+	assert.Zero(t, cfg.App.MinLatencyMS)
+	assert.Zero(t, cfg.App.MaxLatencyMS)
+}
+
+func TestLoad_ChaosReadsExplicitSettings(t *testing.T) {
+	t.Setenv("CHAOS_ENABLED", "true")
+	t.Setenv("FAILURE_RATE", "0.25")
+	t.Setenv("MIN_LATENCY_MS", "10")
+	t.Setenv("MAX_LATENCY_MS", "50")
+
+	cfg, err := Load()
+	require.NoError(t, err)
+
+	assert.True(t, cfg.App.ChaosEnabled)
+	assert.Equal(t, 0.25, cfg.App.FailureRate)
+	assert.Equal(t, 10, cfg.App.MinLatencyMS)
+	assert.Equal(t, 50, cfg.App.MaxLatencyMS)
+}
+
 func TestConfig_Validate(t *testing.T) {
 	t.Run("accepts DATABASE_URL without host or database name", func(t *testing.T) {
 		cfg := &Config{
