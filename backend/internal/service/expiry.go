@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/tusharui/payment-gateway/backend/internal/db"
+	"github.com/tusharui/payment-gateway/backend/internal/events"
 	"github.com/tusharui/payment-gateway/backend/internal/models"
 	"github.com/tusharui/payment-gateway/backend/internal/repository"
 	"gorm.io/gorm"
@@ -89,7 +90,16 @@ func (s *ExpiryService) expireOne(ctx context.Context, authID uuid.UUID, now tim
 		}
 
 		expired = didExpire
-		return nil
+		if !didExpire {
+			return nil
+		}
+
+		expiredTxn, err := transactionRepo.FindByID(ctx, authID)
+		if err != nil {
+			return fmt.Errorf("failed to load expired authorization: %w", err)
+		}
+
+		return emitPaymentEventAt(ctx, tx, events.EventPaymentExpired, expiredTxn, now)
 	}, &sql.TxOptions{Isolation: sql.LevelReadCommitted})
 	if err != nil {
 		return false, fmt.Errorf("failed to expire authorization %s: %w", authID, err)

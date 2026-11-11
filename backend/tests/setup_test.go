@@ -76,7 +76,7 @@ func resetTestData(t *testing.T, database *db.DB) map[uuid.UUID]int64 {
 	t.Helper()
 
 	_, err := database.ExecContext(context.Background(),
-		"TRUNCATE TABLE transactions, idempotency_keys, accounts CASCADE")
+		"TRUNCATE TABLE webhook_deliveries, payment_events, transactions, idempotency_keys, accounts CASCADE")
 	require.NoError(t, err, "failed to truncate tables")
 
 	accounts := []models.Account{

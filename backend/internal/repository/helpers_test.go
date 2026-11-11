@@ -2,9 +2,9 @@ package repository
 
 import (
 	"context"
-	"log"
 	"os"
 	"path/filepath"
+	"sort"
 	"testing"
 
 	"github.com/google/uuid"
@@ -37,16 +37,22 @@ func setupTestDB(t *testing.T) *db.DB {
 func runMigrations(t *testing.T, database *db.DB) {
 	t.Helper()
 
-	migrationPath := filepath.Join("..", "..", "internal", "db", "migrations", "000001_init.up.sql")
-	sqlBytes, err := os.ReadFile(migrationPath) // #nosec G304
+	files, err := filepath.Glob(filepath.Join("..", "..", "internal", "db", "migrations", "*.up.sql"))
 	if err != nil {
-		t.Fatalf("failed to read migration file: %v", err)
+		t.Fatalf("failed to list migration files: %v", err)
 	}
+	sort.Strings(files)
 
-	_, err = database.ExecContext(context.Background(), string(sqlBytes))
-	if err != nil {
-		if err.Error() != "pq: relation \"accounts\" already exists" {
-			t.Logf("migration execution completed (tables may already exist)")
+	for _, path := range files {
+		sqlBytes, err := os.ReadFile(path) // #nosec G304
+		if err != nil {
+			t.Fatalf("failed to read migration file %s: %v", path, err)
+		}
+
+		if _, err := database.ExecContext(context.Background(), string(sqlBytes)); err != nil {
+			// Migrations are not idempotent; an already-migrated test database
+			// is the expected steady state. Anything else is worth surfacing.
+			t.Logf("migration %s skipped: %v", filepath.Base(path), err)
 		}
 	}
 }
@@ -54,7 +60,7 @@ func runMigrations(t *testing.T, database *db.DB) {
 func cleanupTestDB(t *testing.T, database *db.DB) {
 	t.Helper()
 	if err := database.Close(); err != nil {
-		log.Printf("failed to close test database: %v", err)
+		t.Logf("failed to close test database: %v", err)
 	}
 }
 
@@ -62,7 +68,7 @@ func truncateTables(t *testing.T, database *db.DB) {
 	t.Helper()
 
 	_, err := database.ExecContext(context.Background(),
-		"TRUNCATE TABLE transactions, idempotency_keys, accounts CASCADE")
+		"TRUNCATE TABLE webhook_deliveries, payment_events, transactions, idempotency_keys, accounts CASCADE")
 	if err != nil {
 		t.Fatalf("failed to truncate tables: %v", err)
 	}

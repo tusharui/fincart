@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/tusharui/payment-gateway/backend/internal/db"
+	"github.com/tusharui/payment-gateway/backend/internal/events"
 	"github.com/tusharui/payment-gateway/backend/internal/models"
 	"github.com/tusharui/payment-gateway/backend/internal/repository"
 	"github.com/tusharui/payment-gateway/backend/internal/security"
@@ -58,7 +59,7 @@ func (s *AuthorizationService) Authorize(ctx context.Context, request Authorizat
 		}
 
 		authTx = result
-		return nil
+		return emitPaymentEvent(ctx, tx, events.EventPaymentAuthorized, authTx)
 	}, &sql.TxOptions{Isolation: sql.LevelReadCommitted})
 	if err != nil {
 		return nil, err

@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/tusharui/payment-gateway/backend/internal/db"
+	"github.com/tusharui/payment-gateway/backend/internal/events"
 	"github.com/tusharui/payment-gateway/backend/internal/models"
 	"github.com/tusharui/payment-gateway/backend/internal/repository"
 	"gorm.io/gorm"
@@ -39,7 +40,7 @@ func (s *RefundService) Refund(ctx context.Context, captureID uuid.UUID, amount 
 		}
 
 		refundTxn = result
-		return nil
+		return emitPaymentEvent(ctx, tx, events.EventPaymentRefunded, refundTxn)
 	}, &sql.TxOptions{Isolation: sql.LevelReadCommitted})
 	if err != nil {
 		return nil, err

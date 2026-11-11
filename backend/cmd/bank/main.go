@@ -16,6 +16,7 @@ import (
 	"github.com/tusharui/payment-gateway/backend/internal/handlers"
 	"github.com/tusharui/payment-gateway/backend/internal/repository"
 	"github.com/tusharui/payment-gateway/backend/internal/service"
+	"github.com/tusharui/payment-gateway/backend/internal/webhook"
 )
 
 func main() {
@@ -53,6 +54,20 @@ func main() {
 		}
 	}()
 
+	// Stop background workers before the database connection is closed.
+	workerCtx, stopWorkers := context.WithCancel(context.Background())
+	defer stopWorkers()
+
+	var webhookWorkerDone chan struct{}
+	if cfg.Webhook.Enabled {
+		dispatcher := webhook.NewDispatcher(database.GORM(), cfg.Webhook, logger)
+		webhookWorkerDone = make(chan struct{})
+		go func() {
+			defer close(webhookWorkerDone)
+			dispatcher.Run(workerCtx)
+		}()
+	}
+
 	// Start periodic cleanup goroutine
 	stopCleanup := make(chan struct{})
 	go runPeriodicCleanup(database, logger, stopCleanup)
@@ -81,6 +96,10 @@ func main() {
 
 	logger.Info("shutting down server...")
 	close(stopCleanup)
+	stopWorkers()
+	if webhookWorkerDone != nil {
+		<-webhookWorkerDone
+	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()

@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -15,6 +16,7 @@ type Config struct {
 	Logger   LoggerConfig
 	Database DatabaseConfig
 	App      AppConfig
+	Webhook  WebhookConfig
 }
 
 // ServerConfig holds HTTP server configuration
@@ -56,6 +58,20 @@ type LoggerConfig struct {
 	Level string // debug, info, warn, error
 }
 
+// WebhookConfig controls outbound delivery of payment domain events.
+type WebhookConfig struct {
+	Enabled       bool
+	Endpoints     []string
+	Secret        string
+	MaxAttempts   int
+	Timeout       time.Duration
+	BatchSize     int
+	PollInterval  time.Duration
+	LeaseDuration time.Duration
+	BaseBackoff   time.Duration
+	MaxBackoff    time.Duration
+}
+
 // Load loads configuration from environment variables with sensible defaults
 func Load() (*Config, error) {
 	authExpiryHours := getEnvAsInt("AUTH_EXPIRY_HOURS", 168) // 7 days default
@@ -88,6 +104,18 @@ func Load() (*Config, error) {
 		},
 		Logger: LoggerConfig{
 			Level: getEnv("LOG_LEVEL", "info"),
+		},
+		Webhook: WebhookConfig{
+			Enabled:       getEnvAsBool("WEBHOOK_ENABLED", false),
+			Endpoints:     getEnvAsStringSlice("WEBHOOK_ENDPOINTS"),
+			Secret:        getEnv("WEBHOOK_SECRET", ""),
+			MaxAttempts:   getEnvAsInt("WEBHOOK_MAX_ATTEMPTS", 8),
+			Timeout:       getEnvAsDuration("WEBHOOK_TIMEOUT", "10s"),
+			BatchSize:     getEnvAsInt("WEBHOOK_BATCH_SIZE", 50),
+			PollInterval:  getEnvAsDuration("WEBHOOK_POLL_INTERVAL", "2s"),
+			LeaseDuration: getEnvAsDuration("WEBHOOK_LEASE_DURATION", "30s"),
+			BaseBackoff:   getEnvAsDuration("WEBHOOK_BASE_BACKOFF", "5s"),
+			MaxBackoff:    getEnvAsDuration("WEBHOOK_MAX_BACKOFF", "1h"),
 		},
 	}
 
@@ -127,6 +155,56 @@ func (c *Config) Validate() error {
 	validLevels := map[string]bool{"debug": true, "info": true, "warn": true, "error": true}
 	if !validLevels[c.Logger.Level] {
 		return fmt.Errorf("invalid log level: %s (must be debug, info, warn, or error)", c.Logger.Level)
+	}
+
+	if err := c.Webhook.validate(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// validate checks the webhook delivery settings. Webhook configuration is only
+// required when delivery is enabled; disabled webhooks never fail startup.
+func (w *WebhookConfig) validate() error {
+	if !w.Enabled {
+		return nil
+	}
+
+	if len(w.Endpoints) == 0 {
+		return fmt.Errorf("webhook endpoints cannot be empty when webhooks are enabled")
+	}
+	if w.Secret == "" {
+		return fmt.Errorf("webhook secret cannot be empty when webhooks are enabled")
+	}
+
+	for _, endpoint := range w.Endpoints {
+		parsed, err := url.Parse(endpoint)
+		if err != nil || parsed.Host == "" || (parsed.Scheme != "http" && parsed.Scheme != "https") {
+			return fmt.Errorf("invalid webhook endpoint %q: must be an absolute http(s) URL", endpoint)
+		}
+	}
+
+	if w.MaxAttempts < 1 {
+		return fmt.Errorf("webhook max attempts must be at least 1")
+	}
+	if w.BatchSize < 1 {
+		return fmt.Errorf("webhook batch size must be at least 1")
+	}
+	if w.Timeout <= 0 {
+		return fmt.Errorf("webhook timeout must be positive")
+	}
+	if w.PollInterval <= 0 {
+		return fmt.Errorf("webhook poll interval must be positive")
+	}
+	if w.LeaseDuration <= w.Timeout {
+		return fmt.Errorf("webhook lease duration must exceed the delivery timeout")
+	}
+	if w.BaseBackoff <= 0 {
+		return fmt.Errorf("webhook base backoff must be positive")
+	}
+	if w.MaxBackoff < w.BaseBackoff {
+		return fmt.Errorf("webhook max backoff must be greater than or equal to the base backoff")
 	}
 
 	return nil
@@ -205,4 +283,36 @@ func getEnvAsDuration(key, defaultValue string) time.Duration {
 		}
 	}
 	return duration
+}
+
+func getEnvAsBool(key string, defaultValue bool) bool {
+	valueStr := os.Getenv(key)
+	if valueStr == "" {
+		return defaultValue
+	}
+	value, err := strconv.ParseBool(valueStr)
+	if err != nil {
+		return defaultValue
+	}
+	return value
+}
+
+// getEnvAsStringSlice parses a comma-separated environment variable into a
+// trimmed, non-empty list. Empty entries are ignored so trailing commas are
+// harmless.
+func getEnvAsStringSlice(key string) []string {
+	raw := strings.TrimSpace(os.Getenv(key))
+	if raw == "" {
+		return nil
+	}
+
+	parts := strings.Split(raw, ",")
+	values := make([]string, 0, len(parts))
+	for _, part := range parts {
+		if trimmed := strings.TrimSpace(part); trimmed != "" {
+			values = append(values, trimmed)
+		}
+	}
+
+	return values
 }
