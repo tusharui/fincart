@@ -43,5 +43,12 @@ func NewRouter(
 	idempotencyRepo := repository.NewIdempotencyRepository(database.GORM())
 	finalHandler = middleware.Idempotency(idempotencyRepo, logger)(finalHandler)
 
+	// Request ID and access logging sit outside recovery so a panic is logged
+	// with its correlation ID and the resulting 500 is visible in the access
+	// log. Recovery wraps every handler, including the idempotency layer.
+	finalHandler = middleware.Recovery(logger)(finalHandler)
+	finalHandler = middleware.AccessLog(logger)(finalHandler)
+	finalHandler = middleware.RequestID(finalHandler)
+
 	return finalHandler
 }
