@@ -68,12 +68,27 @@ func truncateTables(t *testing.T, database *db.DB) {
 	t.Helper()
 
 	_, err := database.ExecContext(context.Background(),
-		"TRUNCATE TABLE webhook_deliveries, payment_events, transactions, idempotency_keys, accounts CASCADE")
+		"TRUNCATE TABLE webhook_deliveries, payment_events, transactions, idempotency_keys, api_keys, accounts, merchants CASCADE")
 	if err != nil {
 		t.Fatalf("failed to truncate tables: %v", err)
 	}
 
+	seedDefaultMerchant(t, database)
 	seedAccounts(t, database)
+}
+
+// seedDefaultMerchant recreates the merchant that pre-tenancy data belongs to.
+// The auth migration seeds it once, but truncation removes it between tests.
+func seedDefaultMerchant(t *testing.T, database *db.DB) {
+	t.Helper()
+
+	merchant := models.Merchant{
+		ID:   models.DefaultMerchantID,
+		Name: "default",
+	}
+	if err := database.GORM().Create(&merchant).Error; err != nil {
+		t.Fatalf("failed to seed default merchant: %v", err)
+	}
 }
 
 // seedAccounts inserts the standard tokenized test accounts through GORM so the
