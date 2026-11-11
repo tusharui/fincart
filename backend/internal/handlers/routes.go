@@ -8,6 +8,7 @@ import (
 	"github.com/tusharui/payment-gateway/backend/internal/config"
 	"github.com/tusharui/payment-gateway/backend/internal/db"
 	"github.com/tusharui/payment-gateway/backend/internal/middleware"
+	"github.com/tusharui/payment-gateway/backend/internal/observability"
 	"github.com/tusharui/payment-gateway/backend/internal/repository"
 	"github.com/tusharui/payment-gateway/backend/internal/service"
 )
@@ -31,12 +32,18 @@ func NewRouter(
 
 	mux := http.NewServeMux()
 	api.RegisterDocsRoutes(mux)
+
+	metrics := observability.NewMetrics(database.DB)
+	mux.Handle("GET /metrics", metrics.Handler())
+
 	api.HandlerWithOptions(strictHandler, api.StdHTTPServerOptions{
 		BaseRouter:       mux,
 		ErrorHandlerFunc: handler.requestErrorHandler,
 	})
 
-	var finalHandler http.Handler = mux
+	// CaptureRoute sits directly outside the mux so the matched route pattern
+	// is available to the metrics middleware for label aggregation.
+	var finalHandler http.Handler = observability.CaptureRoute(mux)
 
 	finalHandler = middleware.FailureInjection(&cfg.App, logger)(finalHandler)
 
@@ -46,8 +53,11 @@ func NewRouter(
 	// Request ID and access logging sit outside recovery so a panic is logged
 	// with its correlation ID and the resulting 500 is visible in the access
 	// log. Recovery wraps every handler, including the idempotency layer.
+	// Metrics are outermost (after request IDs) so short-circuited responses
+	// are measured as well.
 	finalHandler = middleware.Recovery(logger)(finalHandler)
 	finalHandler = middleware.AccessLog(logger)(finalHandler)
+	finalHandler = metrics.Middleware()(finalHandler)
 	finalHandler = middleware.RequestID(finalHandler)
 
 	return finalHandler
