@@ -17,6 +17,18 @@ import (
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
+	// List API keys
+	// (GET /api/v1/api-keys)
+	ListAPIKeys(w http.ResponseWriter, r *http.Request)
+	// Issue an API key
+	// (POST /api/v1/api-keys)
+	CreateAPIKey(w http.ResponseWriter, r *http.Request)
+	// Revoke an API key
+	// (DELETE /api/v1/api-keys/{apiKeyId})
+	RevokeAPIKey(w http.ResponseWriter, r *http.Request, apiKeyId APIKeyId)
+	// Rotate an API key
+	// (POST /api/v1/api-keys/{apiKeyId}/rotate)
+	RotateAPIKey(w http.ResponseWriter, r *http.Request, apiKeyId APIKeyId)
 	// Create authorization hold
 	// (POST /api/v1/authorizations)
 	CreateAuthorization(w http.ResponseWriter, r *http.Request, params CreateAuthorizationParams)
@@ -54,6 +66,108 @@ type ServerInterfaceWrapper struct {
 }
 
 type MiddlewareFunc func(http.Handler) http.Handler
+
+// ListAPIKeys operation middleware
+func (siw *ServerInterfaceWrapper) ListAPIKeys(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListAPIKeys(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateAPIKey operation middleware
+func (siw *ServerInterfaceWrapper) CreateAPIKey(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateAPIKey(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RevokeAPIKey operation middleware
+func (siw *ServerInterfaceWrapper) RevokeAPIKey(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "apiKeyId" -------------
+	var apiKeyId APIKeyId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "apiKeyId", r.PathValue("apiKeyId"), &apiKeyId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "apiKeyId", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RevokeAPIKey(w, r, apiKeyId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RotateAPIKey operation middleware
+func (siw *ServerInterfaceWrapper) RotateAPIKey(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "apiKeyId" -------------
+	var apiKeyId APIKeyId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "apiKeyId", r.PathValue("apiKeyId"), &apiKeyId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "apiKeyId", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RotateAPIKey(w, r, apiKeyId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
 
 // CreateAuthorization operation middleware
 func (siw *ServerInterfaceWrapper) CreateAuthorization(w http.ResponseWriter, r *http.Request) {
@@ -496,6 +610,10 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 		ErrorHandlerFunc:   options.ErrorHandlerFunc,
 	}
 
+	m.HandleFunc("GET "+options.BaseURL+"/api/v1/api-keys", wrapper.ListAPIKeys)
+	m.HandleFunc("POST "+options.BaseURL+"/api/v1/api-keys", wrapper.CreateAPIKey)
+	m.HandleFunc("DELETE "+options.BaseURL+"/api/v1/api-keys/{apiKeyId}", wrapper.RevokeAPIKey)
+	m.HandleFunc("POST "+options.BaseURL+"/api/v1/api-keys/{apiKeyId}/rotate", wrapper.RotateAPIKey)
 	m.HandleFunc("POST "+options.BaseURL+"/api/v1/authorizations", wrapper.CreateAuthorization)
 	m.HandleFunc("GET "+options.BaseURL+"/api/v1/authorizations/{authorizationId}", wrapper.GetAuthorization)
 	m.HandleFunc("POST "+options.BaseURL+"/api/v1/captures", wrapper.CreateCapture)
@@ -535,6 +653,265 @@ type TooManyRequestsJSONResponse struct {
 }
 
 type UnauthorizedJSONResponse ErrorResponse
+
+type ListAPIKeysRequestObject struct {
+}
+
+type ListAPIKeysResponseObject interface {
+	VisitListAPIKeysResponse(w http.ResponseWriter) error
+}
+
+type ListAPIKeys200JSONResponse APIKeyListResponse
+
+func (response ListAPIKeys200JSONResponse) VisitListAPIKeysResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ListAPIKeys401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response ListAPIKeys401JSONResponse) VisitListAPIKeysResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ListAPIKeys403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response ListAPIKeys403JSONResponse) VisitListAPIKeysResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ListAPIKeys429JSONResponse struct{ TooManyRequestsJSONResponse }
+
+func (response ListAPIKeys429JSONResponse) VisitListAPIKeysResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Retry-After", fmt.Sprint(response.Headers.RetryAfter))
+	w.WriteHeader(429)
+
+	return json.NewEncoder(w).Encode(response.Body)
+}
+
+type ListAPIKeys500JSONResponse struct{ InternalErrorJSONResponse }
+
+func (response ListAPIKeys500JSONResponse) VisitListAPIKeysResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CreateAPIKeyRequestObject struct {
+	Body *CreateAPIKeyJSONRequestBody
+}
+
+type CreateAPIKeyResponseObject interface {
+	VisitCreateAPIKeyResponse(w http.ResponseWriter) error
+}
+
+type CreateAPIKey201JSONResponse APIKeyCreatedResponse
+
+func (response CreateAPIKey201JSONResponse) VisitCreateAPIKeyResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CreateAPIKey400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response CreateAPIKey400JSONResponse) VisitCreateAPIKeyResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CreateAPIKey401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response CreateAPIKey401JSONResponse) VisitCreateAPIKeyResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CreateAPIKey403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response CreateAPIKey403JSONResponse) VisitCreateAPIKeyResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CreateAPIKey429JSONResponse struct{ TooManyRequestsJSONResponse }
+
+func (response CreateAPIKey429JSONResponse) VisitCreateAPIKeyResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Retry-After", fmt.Sprint(response.Headers.RetryAfter))
+	w.WriteHeader(429)
+
+	return json.NewEncoder(w).Encode(response.Body)
+}
+
+type CreateAPIKey500JSONResponse struct{ InternalErrorJSONResponse }
+
+func (response CreateAPIKey500JSONResponse) VisitCreateAPIKeyResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type RevokeAPIKeyRequestObject struct {
+	ApiKeyId APIKeyId `json:"apiKeyId"`
+}
+
+type RevokeAPIKeyResponseObject interface {
+	VisitRevokeAPIKeyResponse(w http.ResponseWriter) error
+}
+
+type RevokeAPIKey204Response struct {
+}
+
+func (response RevokeAPIKey204Response) VisitRevokeAPIKeyResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type RevokeAPIKey400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response RevokeAPIKey400JSONResponse) VisitRevokeAPIKeyResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type RevokeAPIKey401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response RevokeAPIKey401JSONResponse) VisitRevokeAPIKeyResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type RevokeAPIKey403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response RevokeAPIKey403JSONResponse) VisitRevokeAPIKeyResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type RevokeAPIKey404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response RevokeAPIKey404JSONResponse) VisitRevokeAPIKeyResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type RevokeAPIKey429JSONResponse struct{ TooManyRequestsJSONResponse }
+
+func (response RevokeAPIKey429JSONResponse) VisitRevokeAPIKeyResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Retry-After", fmt.Sprint(response.Headers.RetryAfter))
+	w.WriteHeader(429)
+
+	return json.NewEncoder(w).Encode(response.Body)
+}
+
+type RevokeAPIKey500JSONResponse struct{ InternalErrorJSONResponse }
+
+func (response RevokeAPIKey500JSONResponse) VisitRevokeAPIKeyResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type RotateAPIKeyRequestObject struct {
+	ApiKeyId APIKeyId `json:"apiKeyId"`
+}
+
+type RotateAPIKeyResponseObject interface {
+	VisitRotateAPIKeyResponse(w http.ResponseWriter) error
+}
+
+type RotateAPIKey200JSONResponse APIKeyCreatedResponse
+
+func (response RotateAPIKey200JSONResponse) VisitRotateAPIKeyResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type RotateAPIKey400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response RotateAPIKey400JSONResponse) VisitRotateAPIKeyResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type RotateAPIKey401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response RotateAPIKey401JSONResponse) VisitRotateAPIKeyResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type RotateAPIKey403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response RotateAPIKey403JSONResponse) VisitRotateAPIKeyResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type RotateAPIKey404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response RotateAPIKey404JSONResponse) VisitRotateAPIKeyResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type RotateAPIKey429JSONResponse struct{ TooManyRequestsJSONResponse }
+
+func (response RotateAPIKey429JSONResponse) VisitRotateAPIKeyResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Retry-After", fmt.Sprint(response.Headers.RetryAfter))
+	w.WriteHeader(429)
+
+	return json.NewEncoder(w).Encode(response.Body)
+}
+
+type RotateAPIKey500JSONResponse struct{ InternalErrorJSONResponse }
+
+func (response RotateAPIKey500JSONResponse) VisitRotateAPIKeyResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
 
 type CreateAuthorizationRequestObject struct {
 	Params CreateAuthorizationParams
@@ -1150,6 +1527,18 @@ func (response GetReady503JSONResponse) VisitGetReadyResponse(w http.ResponseWri
 
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
+	// List API keys
+	// (GET /api/v1/api-keys)
+	ListAPIKeys(ctx context.Context, request ListAPIKeysRequestObject) (ListAPIKeysResponseObject, error)
+	// Issue an API key
+	// (POST /api/v1/api-keys)
+	CreateAPIKey(ctx context.Context, request CreateAPIKeyRequestObject) (CreateAPIKeyResponseObject, error)
+	// Revoke an API key
+	// (DELETE /api/v1/api-keys/{apiKeyId})
+	RevokeAPIKey(ctx context.Context, request RevokeAPIKeyRequestObject) (RevokeAPIKeyResponseObject, error)
+	// Rotate an API key
+	// (POST /api/v1/api-keys/{apiKeyId}/rotate)
+	RotateAPIKey(ctx context.Context, request RotateAPIKeyRequestObject) (RotateAPIKeyResponseObject, error)
 	// Create authorization hold
 	// (POST /api/v1/authorizations)
 	CreateAuthorization(ctx context.Context, request CreateAuthorizationRequestObject) (CreateAuthorizationResponseObject, error)
@@ -1206,6 +1595,113 @@ type strictHandler struct {
 	ssi         StrictServerInterface
 	middlewares []StrictMiddlewareFunc
 	options     StrictHTTPServerOptions
+}
+
+// ListAPIKeys operation middleware
+func (sh *strictHandler) ListAPIKeys(w http.ResponseWriter, r *http.Request) {
+	var request ListAPIKeysRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListAPIKeys(ctx, request.(ListAPIKeysRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListAPIKeys")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListAPIKeysResponseObject); ok {
+		if err := validResponse.VisitListAPIKeysResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateAPIKey operation middleware
+func (sh *strictHandler) CreateAPIKey(w http.ResponseWriter, r *http.Request) {
+	var request CreateAPIKeyRequestObject
+
+	var body CreateAPIKeyJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateAPIKey(ctx, request.(CreateAPIKeyRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateAPIKey")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateAPIKeyResponseObject); ok {
+		if err := validResponse.VisitCreateAPIKeyResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RevokeAPIKey operation middleware
+func (sh *strictHandler) RevokeAPIKey(w http.ResponseWriter, r *http.Request, apiKeyId APIKeyId) {
+	var request RevokeAPIKeyRequestObject
+
+	request.ApiKeyId = apiKeyId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RevokeAPIKey(ctx, request.(RevokeAPIKeyRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RevokeAPIKey")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RevokeAPIKeyResponseObject); ok {
+		if err := validResponse.VisitRevokeAPIKeyResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RotateAPIKey operation middleware
+func (sh *strictHandler) RotateAPIKey(w http.ResponseWriter, r *http.Request, apiKeyId APIKeyId) {
+	var request RotateAPIKeyRequestObject
+
+	request.ApiKeyId = apiKeyId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RotateAPIKey(ctx, request.(RotateAPIKeyRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RotateAPIKey")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RotateAPIKeyResponseObject); ok {
+		if err := validResponse.VisitRotateAPIKeyResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
 }
 
 // CreateAuthorization operation middleware

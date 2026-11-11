@@ -33,6 +33,8 @@ tags:
     description: Authorization void operations
   - name: Refund
     description: Refund operations
+  - name: API Key
+    description: Merchant API key management
 
 paths:
   /health:
@@ -312,6 +314,113 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
+  /api/v1/api-keys:
+    get:
+      operationId: listAPIKeys
+      summary: List API keys
+      description: List the merchant's API keys. Secrets are never returned.
+      tags: [API Key]
+      responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '200':
+          description: API keys owned by the merchant
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIKeyListResponse'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    post:
+      operationId: createAPIKey
+      summary: Issue an API key
+      description: |
+        Create a new API key. The raw secret is returned only in this response
+        and is never stored in plaintext.
+      tags: [API Key]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAPIKeyRequest'
+      responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '201':
+          description: API key created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIKeyCreatedResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/api-keys/{apiKeyId}:
+    delete:
+      operationId: revokeAPIKey
+      summary: Revoke an API key
+      description: Revoke a key so it can no longer authenticate.
+      tags: [API Key]
+      parameters:
+        - $ref: '#/components/parameters/APIKeyId'
+      responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '204':
+          description: API key revoked
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/api-keys/{apiKeyId}/rotate:
+    post:
+      operationId: rotateAPIKey
+      summary: Rotate an API key
+      description: |
+        Replace the secret of an existing key while keeping its identity, name,
+        scopes, and rate limit. The old secret stops working immediately and the
+        new secret is returned only in this response.
+      tags: [API Key]
+      parameters:
+        - $ref: '#/components/parameters/APIKeyId'
+      responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '200':
+          description: API key rotated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIKeyCreatedResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
 components:
   # ============================================================================
   # Security
@@ -366,6 +475,15 @@ components:
       schema:
         type: string
         pattern: '^ref_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+
+    APIKeyId:
+      name: apiKeyId
+      in: path
+      required: true
+      description: API key identifier (UUID)
+      schema:
+        type: string
+        format: uuid
 
   # ============================================================================
   # Schemas
@@ -431,6 +549,96 @@ components:
         - service_unavailable
         - not_found
         - internal_error
+
+    # --------------------------------------------------------------------------
+    # API Keys
+    # --------------------------------------------------------------------------
+    APIKeyScope:
+      type: string
+      enum: [payments, admin]
+
+    APIKey:
+      type: object
+      required: [id, name, key_prefix, key_last4, scopes, rate_limit_per_minute, bootstrap, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        key_prefix:
+          type: string
+          description: Non-secret prefix shown in listings
+        key_last4:
+          type: string
+          description: Last four characters of the secret
+        scopes:
+          type: array
+          items:
+            $ref: '#/components/schemas/APIKeyScope'
+        rate_limit_per_minute:
+          type: integer
+          description: Requests per minute; 0 inherits the deployment default
+        bootstrap:
+          type: boolean
+          description: True for the key reconciled from environment configuration
+        created_at:
+          type: string
+          format: date-time
+        last_used_at:
+          type: string
+          format: date-time
+          nullable: true
+        expires_at:
+          type: string
+          format: date-time
+          nullable: true
+        revoked_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    APIKeyListResponse:
+      type: object
+      required: [api_keys]
+      properties:
+        api_keys:
+          type: array
+          items:
+            $ref: '#/components/schemas/APIKey'
+
+    CreateAPIKeyRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+          example: "checkout-service"
+        scopes:
+          type: array
+          description: Scopes granted to the key. Defaults to [payments].
+          items:
+            $ref: '#/components/schemas/APIKeyScope'
+        rate_limit_per_minute:
+          type: integer
+          minimum: 0
+          description: Requests per minute; 0 inherits the deployment default
+          example: 120
+        expires_at:
+          type: string
+          format: date-time
+
+    APIKeyCreatedResponse:
+      type: object
+      required: [api_key, secret]
+      properties:
+        api_key:
+          $ref: '#/components/schemas/APIKey'
+        secret:
+          type: string
+          description: Raw API key. Shown once and never stored in plaintext.
 
     # --------------------------------------------------------------------------
     # Authorization

@@ -25,9 +25,18 @@ func NewRouter(
 	captureService := service.NewCaptureService(database)
 	voidService := service.NewVoidService(database)
 	refundService := service.NewRefundService(database)
+	apiKeyManager := service.NewAPIKeyService(database, logger)
 	apiKeyService := service.NewAuthService(database, cfg.Auth.LastUsedThrottle, logger)
 
-	handler := NewHandler(authService, captureService, voidService, refundService, database, logger)
+	handler := NewHandler(
+		authService,
+		captureService,
+		voidService,
+		refundService,
+		database,
+		logger,
+		WithAPIKeyManager(apiKeyManager),
+	)
 	strictHandler := api.NewStrictHandlerWithOptions(handler, nil, api.StrictHTTPServerOptions{
 		RequestErrorHandlerFunc:  handler.requestErrorHandler,
 		ResponseErrorHandlerFunc: handler.responseErrorHandler,

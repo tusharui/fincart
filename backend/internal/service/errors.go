@@ -43,6 +43,8 @@ const (
 	ErrCodeCaptureNotFound     = "capture_not_found"
 	ErrCodeCaptureNotCompleted = "capture_not_completed"
 	ErrCodeRefundNotFound      = "refund_not_found"
+	ErrCodeInvalidRequest      = "invalid_request"
+	ErrCodeNotFound            = "not_found"
 	ErrCodeInternalError       = "internal_error"
 )
 

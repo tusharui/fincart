@@ -5,10 +5,18 @@ package api
 
 import (
 	"time"
+
+	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
 const (
 	BearerAuthScopes = "bearerAuth.Scopes"
+)
+
+// Defines values for APIKeyScope.
+const (
+	Admin    APIKeyScope = "admin"
+	Payments APIKeyScope = "payments"
 )
 
 // Defines values for AuthorizationResponseStatus.
@@ -79,6 +87,44 @@ const (
 	Voided VoidResponseStatus = "voided"
 )
 
+// APIKey defines model for APIKey.
+type APIKey struct {
+	// Bootstrap True for the key reconciled from environment configuration
+	Bootstrap bool               `json:"bootstrap"`
+	CreatedAt time.Time          `json:"created_at"`
+	ExpiresAt time.Time          `json:"expires_at,omitzero"`
+	Id        openapi_types.UUID `json:"id"`
+
+	// KeyLast4 Last four characters of the secret
+	KeyLast4 string `json:"key_last4"`
+
+	// KeyPrefix Non-secret prefix shown in listings
+	KeyPrefix  string    `json:"key_prefix"`
+	LastUsedAt time.Time `json:"last_used_at,omitzero"`
+	Name       string    `json:"name"`
+
+	// RateLimitPerMinute Requests per minute; 0 inherits the deployment default
+	RateLimitPerMinute int           `json:"rate_limit_per_minute"`
+	RevokedAt          time.Time     `json:"revoked_at,omitzero"`
+	Scopes             []APIKeyScope `json:"scopes"`
+}
+
+// APIKeyCreatedResponse defines model for APIKeyCreatedResponse.
+type APIKeyCreatedResponse struct {
+	ApiKey APIKey `json:"api_key"`
+
+	// Secret Raw API key. Shown once and never stored in plaintext.
+	Secret string `json:"secret"`
+}
+
+// APIKeyListResponse defines model for APIKeyListResponse.
+type APIKeyListResponse struct {
+	ApiKeys []APIKey `json:"api_keys"`
+}
+
+// APIKeyScope defines model for APIKeyScope.
+type APIKeyScope string
+
 // AuthorizationResponse defines model for AuthorizationResponse.
 type AuthorizationResponse struct {
 	Amount          int64     `json:"amount"`
@@ -116,6 +162,18 @@ type CaptureResponse struct {
 
 // CaptureResponseStatus defines model for CaptureResponse.Status.
 type CaptureResponseStatus string
+
+// CreateAPIKeyRequest defines model for CreateAPIKeyRequest.
+type CreateAPIKeyRequest struct {
+	ExpiresAt time.Time `json:"expires_at,omitempty,omitzero"`
+	Name      string    `json:"name"`
+
+	// RateLimitPerMinute Requests per minute; 0 inherits the deployment default
+	RateLimitPerMinute int `json:"rate_limit_per_minute,omitempty,omitzero"`
+
+	// Scopes Scopes granted to the key. Defaults to [payments].
+	Scopes []APIKeyScope `json:"scopes,omitempty,omitzero"`
+}
 
 // CreateAuthorizationRequest defines model for CreateAuthorizationRequest.
 type CreateAuthorizationRequest struct {
@@ -222,6 +280,9 @@ type VoidResponse struct {
 // VoidResponseStatus defines model for VoidResponse.Status.
 type VoidResponseStatus string
 
+// APIKeyId defines model for APIKeyId.
+type APIKeyId = openapi_types.UUID
+
 // AuthorizationId defines model for AuthorizationId.
 type AuthorizationId = string
 
@@ -287,6 +348,9 @@ type CreateVoidParams struct {
 	// IdempotencyKey Unique key for idempotent requests (max 255 chars)
 	IdempotencyKey IdempotencyKeyRequired `json:"Idempotency-Key"`
 }
+
+// CreateAPIKeyJSONRequestBody defines body for CreateAPIKey for application/json ContentType.
+type CreateAPIKeyJSONRequestBody = CreateAPIKeyRequest
 
 // CreateAuthorizationJSONRequestBody defines body for CreateAuthorization for application/json ContentType.
 type CreateAuthorizationJSONRequestBody = CreateAuthorizationRequest

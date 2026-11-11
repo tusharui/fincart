@@ -52,6 +52,10 @@ func (s *stubAPIKeyRepository) Revoke(context.Context, uuid.UUID, uuid.UUID, tim
 	panic("Revoke is not used by AuthService tests")
 }
 
+func (s *stubAPIKeyRepository) Rotate(context.Context, uuid.UUID, uuid.UUID, string, string, string) (bool, error) {
+	panic("Rotate is not used by AuthService tests")
+}
+
 func (s *stubAPIKeyRepository) TouchLastUsed(_ context.Context, _ uuid.UUID, usedAt, staleBefore time.Time) error {
 	s.touchCalls++
 	s.touchedAt = usedAt

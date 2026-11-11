@@ -18,6 +18,7 @@ type APIKeyRepository interface {
 	FindByID(ctx context.Context, merchantID, id uuid.UUID) (*models.APIKey, error)
 	ListByMerchant(ctx context.Context, merchantID uuid.UUID) ([]models.APIKey, error)
 	Revoke(ctx context.Context, merchantID, id uuid.UUID, revokedAt time.Time) (bool, error)
+	Rotate(ctx context.Context, merchantID, id uuid.UUID, keyHash, keyPrefix, keyLast4 string) (bool, error)
 	TouchLastUsed(ctx context.Context, id uuid.UUID, usedAt, staleBefore time.Time) error
 	EnsureBootstrap(ctx context.Context, key *models.APIKey) (*models.APIKey, error)
 	CountActive(ctx context.Context, now time.Time) (int64, error)
@@ -103,6 +104,25 @@ func (r *apiKeyRepository) Revoke(ctx context.Context, merchantID, id uuid.UUID,
 		Update("revoked_at", revokedAt)
 	if result.Error != nil {
 		return false, fmt.Errorf("failed to revoke api key: %w", result.Error)
+	}
+
+	return result.RowsAffected == 1, nil
+}
+
+// Rotate replaces the secret of an active key while preserving its identity,
+// metadata, and scopes. It reports false when the key does not belong to the
+// merchant or has been revoked.
+func (r *apiKeyRepository) Rotate(ctx context.Context, merchantID, id uuid.UUID, keyHash, keyPrefix, keyLast4 string) (bool, error) {
+	result := r.db.WithContext(ctx).
+		Model(&models.APIKey{}).
+		Where("id = ? AND merchant_id = ? AND revoked_at IS NULL", id, merchantID).
+		Updates(map[string]any{
+			"key_hash":   keyHash,
+			"key_prefix": keyPrefix,
+			"key_last4":  keyLast4,
+		})
+	if result.Error != nil {
+		return false, fmt.Errorf("failed to rotate api key: %w", result.Error)
 	}
 
 	return result.RowsAffected == 1, nil

@@ -3,8 +3,8 @@ package service
 import (
 	"context"
 
-	"github.com/tusharui/payment-gateway/backend/internal/models"
 	"github.com/google/uuid"
+	"github.com/tusharui/payment-gateway/backend/internal/models"
 )
 
 // HealthChecker validates system health.
@@ -33,6 +33,14 @@ type Voider interface {
 type Refunder interface {
 	Refund(ctx context.Context, captureID uuid.UUID, amount int64) (*models.Transaction, error)
 	GetRefund(ctx context.Context, refundID uuid.UUID) (*models.Transaction, error)
+}
+
+// APIKeyManager manages API credentials for the authenticated merchant.
+type APIKeyManager interface {
+	Create(ctx context.Context, request APIKeyIssueRequest) (*IssuedAPIKey, error)
+	List(ctx context.Context) ([]models.APIKey, error)
+	Rotate(ctx context.Context, id uuid.UUID) (*IssuedAPIKey, error)
+	Revoke(ctx context.Context, id uuid.UUID) error
 }
 
 // Ensure concrete types implement interfaces

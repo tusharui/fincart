@@ -155,6 +155,61 @@ func TestAPIKeyRepository_EnsureBootstrapReplacesCredential(t *testing.T) {
 	assert.Len(t, keys, 1, "rotating the bootstrap key must not accumulate credentials")
 }
 
+func TestAPIKeyRepository_Rotate(t *testing.T) {
+	database := setupTestDB(t)
+	defer cleanupTestDB(t, database)
+	truncateTables(t, database)
+
+	ctx := context.Background()
+	merchant := newTestMerchant(t, database, "rotate")
+	repo := NewAPIKeyRepository(database.GORM())
+
+	key, oldCredential := newTestAPIKey(t, merchant.ID, "primary", models.ScopePayments)
+	require.NoError(t, repo.Create(ctx, key))
+
+	newCredential, err := security.GenerateAPIKey()
+	require.NoError(t, err)
+
+	rotated, err := repo.Rotate(
+		ctx,
+		merchant.ID,
+		key.ID,
+		security.HashToken(newCredential.Raw),
+		newCredential.Prefix,
+		newCredential.Last4,
+	)
+	require.NoError(t, err)
+	assert.True(t, rotated)
+
+	oldLookup, err := repo.FindByHash(ctx, security.HashToken(oldCredential.Raw))
+	require.NoError(t, err)
+	assert.Nil(t, oldLookup, "the previous secret must stop authenticating")
+
+	stored, err := repo.FindByID(ctx, merchant.ID, key.ID)
+	require.NoError(t, err)
+	require.NotNil(t, stored)
+	assert.Equal(t, newCredential.Prefix, stored.KeyPrefix)
+	assert.Equal(t, newCredential.Last4, stored.KeyLast4)
+	assert.Equal(t, key.Name, stored.Name, "rotation keeps the key identity")
+	assert.Equal(t, key.Scopes, stored.Scopes, "rotation keeps the key scopes")
+
+	newLookup, err := repo.FindByHash(ctx, security.HashToken(newCredential.Raw))
+	require.NoError(t, err)
+	require.NotNil(t, newLookup)
+	assert.Equal(t, key.ID, newLookup.ID)
+
+	crossTenant, err := repo.Rotate(ctx, uuid.New(), key.ID, "hash", "prefix", "last")
+	require.NoError(t, err)
+	assert.False(t, crossTenant, "a key must not be rotatable by another merchant")
+
+	_, err = repo.Revoke(ctx, merchant.ID, key.ID, time.Now())
+	require.NoError(t, err)
+
+	afterRevoke, err := repo.Rotate(ctx, merchant.ID, key.ID, "hash", "prefix", "last")
+	require.NoError(t, err)
+	assert.False(t, afterRevoke, "a revoked key must not be rotated")
+}
+
 func TestAPIKey_IsActive(t *testing.T) {
 	now := time.Now()
 	expired := now.Add(-time.Minute)
