@@ -60,6 +60,12 @@ func (siw *ServerInterfaceWrapper) CreateAuthorization(w http.ResponseWriter, r 
 
 	var err error
 
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
 	// Parameter object where we will unmarshal all parameters from the context
 	var params CreateAuthorizationParams
 
@@ -113,6 +119,12 @@ func (siw *ServerInterfaceWrapper) GetAuthorization(w http.ResponseWriter, r *ht
 		return
 	}
 
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetAuthorization(w, r, authorizationId)
 	}))
@@ -128,6 +140,12 @@ func (siw *ServerInterfaceWrapper) GetAuthorization(w http.ResponseWriter, r *ht
 func (siw *ServerInterfaceWrapper) CreateCapture(w http.ResponseWriter, r *http.Request) {
 
 	var err error
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
 
 	// Parameter object where we will unmarshal all parameters from the context
 	var params CreateCaptureParams
@@ -182,6 +200,12 @@ func (siw *ServerInterfaceWrapper) GetCapture(w http.ResponseWriter, r *http.Req
 		return
 	}
 
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetCapture(w, r, captureId)
 	}))
@@ -197,6 +221,12 @@ func (siw *ServerInterfaceWrapper) GetCapture(w http.ResponseWriter, r *http.Req
 func (siw *ServerInterfaceWrapper) CreateRefund(w http.ResponseWriter, r *http.Request) {
 
 	var err error
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
 
 	// Parameter object where we will unmarshal all parameters from the context
 	var params CreateRefundParams
@@ -251,6 +281,12 @@ func (siw *ServerInterfaceWrapper) GetRefund(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetRefund(w, r, refundId)
 	}))
@@ -266,6 +302,12 @@ func (siw *ServerInterfaceWrapper) GetRefund(w http.ResponseWriter, r *http.Requ
 func (siw *ServerInterfaceWrapper) CreateVoid(w http.ResponseWriter, r *http.Request) {
 
 	var err error
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
 
 	// Parameter object where we will unmarshal all parameters from the context
 	var params CreateVoidParams
@@ -471,6 +513,8 @@ type BadRequestJSONResponse ErrorResponse
 
 type ConflictJSONResponse ErrorResponse
 
+type ForbiddenJSONResponse ErrorResponse
+
 type InternalErrorJSONResponse ErrorResponse
 
 type NotFoundJSONResponse ErrorResponse
@@ -480,6 +524,8 @@ type PayloadTooLargeJSONResponse ErrorResponse
 type PaymentRequiredJSONResponse ErrorResponse
 
 type ServiceUnavailableJSONResponse ErrorResponse
+
+type UnauthorizedJSONResponse ErrorResponse
 
 type CreateAuthorizationRequestObject struct {
 	Params CreateAuthorizationParams
@@ -508,11 +554,29 @@ func (response CreateAuthorization400JSONResponse) VisitCreateAuthorizationRespo
 	return json.NewEncoder(w).Encode(response)
 }
 
+type CreateAuthorization401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response CreateAuthorization401JSONResponse) VisitCreateAuthorizationResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
 type CreateAuthorization402JSONResponse struct{ PaymentRequiredJSONResponse }
 
 func (response CreateAuthorization402JSONResponse) VisitCreateAuthorizationResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(402)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CreateAuthorization403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response CreateAuthorization403JSONResponse) VisitCreateAuthorizationResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
 
 	return json.NewEncoder(w).Encode(response)
 }
@@ -570,6 +634,24 @@ func (response GetAuthorization200JSONResponse) VisitGetAuthorizationResponse(w 
 	return json.NewEncoder(w).Encode(response)
 }
 
+type GetAuthorization401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response GetAuthorization401JSONResponse) VisitGetAuthorizationResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetAuthorization403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response GetAuthorization403JSONResponse) VisitGetAuthorizationResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
 type GetAuthorization404JSONResponse struct{ NotFoundJSONResponse }
 
 func (response GetAuthorization404JSONResponse) VisitGetAuthorizationResponse(w http.ResponseWriter) error {
@@ -602,6 +684,24 @@ type CreateCapture400JSONResponse struct{ BadRequestJSONResponse }
 func (response CreateCapture400JSONResponse) VisitCreateCaptureResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CreateCapture401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response CreateCapture401JSONResponse) VisitCreateCaptureResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CreateCapture403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response CreateCapture403JSONResponse) VisitCreateCaptureResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
 
 	return json.NewEncoder(w).Encode(response)
 }
@@ -668,6 +768,24 @@ func (response GetCapture200JSONResponse) VisitGetCaptureResponse(w http.Respons
 	return json.NewEncoder(w).Encode(response)
 }
 
+type GetCapture401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response GetCapture401JSONResponse) VisitGetCaptureResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetCapture403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response GetCapture403JSONResponse) VisitGetCaptureResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
 type GetCapture404JSONResponse struct{ NotFoundJSONResponse }
 
 func (response GetCapture404JSONResponse) VisitGetCaptureResponse(w http.ResponseWriter) error {
@@ -700,6 +818,24 @@ type CreateRefund400JSONResponse struct{ BadRequestJSONResponse }
 func (response CreateRefund400JSONResponse) VisitCreateRefundResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CreateRefund401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response CreateRefund401JSONResponse) VisitCreateRefundResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CreateRefund403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response CreateRefund403JSONResponse) VisitCreateRefundResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
 
 	return json.NewEncoder(w).Encode(response)
 }
@@ -766,6 +902,24 @@ func (response GetRefund200JSONResponse) VisitGetRefundResponse(w http.ResponseW
 	return json.NewEncoder(w).Encode(response)
 }
 
+type GetRefund401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response GetRefund401JSONResponse) VisitGetRefundResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetRefund403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response GetRefund403JSONResponse) VisitGetRefundResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
 type GetRefund404JSONResponse struct{ NotFoundJSONResponse }
 
 func (response GetRefund404JSONResponse) VisitGetRefundResponse(w http.ResponseWriter) error {
@@ -798,6 +952,24 @@ type CreateVoid400JSONResponse struct{ BadRequestJSONResponse }
 func (response CreateVoid400JSONResponse) VisitCreateVoidResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CreateVoid401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response CreateVoid401JSONResponse) VisitCreateVoidResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CreateVoid403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response CreateVoid403JSONResponse) VisitCreateVoidResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
 
 	return json.NewEncoder(w).Encode(response)
 }

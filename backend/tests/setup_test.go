@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
+	"github.com/lib/pq"
 	"github.com/stretchr/testify/require"
 	"github.com/tusharui/payment-gateway/backend/internal/config"
 	"github.com/tusharui/payment-gateway/backend/internal/db"
@@ -25,6 +26,12 @@ type TestServer struct {
 	Server   *httptest.Server
 	Database *db.DB
 	t        *testing.T
+
+	// APIKey is the raw credential for the seeded integration test merchant.
+	// It carries both the payments and admin scopes.
+	APIKey string
+	// MerchantID identifies the tenant that owns the seeded key and accounts.
+	MerchantID uuid.UUID
 
 	// initialBalances records the settled balance each seeded account started
 	// with so ledger reconciliation can be checked against a known baseline.
@@ -48,7 +55,7 @@ func SetupTest(t *testing.T) *TestServer {
 	database, err := db.Connect(context.Background(), &cfg.Database, logger)
 	require.NoError(t, err, "failed to connect to database")
 
-	initialBalances := resetTestData(t, database)
+	initialBalances, apiKey := resetTestData(t, database)
 
 	router := handlers.NewRouter(database, cfg, logger)
 	server := httptest.NewServer(router)
@@ -57,8 +64,30 @@ func SetupTest(t *testing.T) *TestServer {
 		Server:          server,
 		Database:        database,
 		t:               t,
+		APIKey:          apiKey,
+		MerchantID:      models.DefaultMerchantID,
 		initialBalances: initialBalances,
 	}
+}
+
+// AuthRequest attaches the test API key to a request.
+func (ts *TestServer) AuthRequest(req *http.Request) *http.Request {
+	req.Header.Set("Authorization", "Bearer "+ts.APIKey)
+
+	return req
+}
+
+// Get issues an authenticated GET request.
+func (ts *TestServer) Get(t *testing.T, path string) *http.Response {
+	t.Helper()
+
+	req, err := http.NewRequest(http.MethodGet, ts.URL(path), nil)
+	require.NoError(t, err)
+
+	resp, err := http.DefaultClient.Do(ts.AuthRequest(req))
+	require.NoError(t, err)
+
+	return resp
 }
 
 // Close shuts down the test server and database connection.
@@ -72,12 +101,29 @@ func (ts *TestServer) URL(path string) string {
 	return ts.Server.URL + path
 }
 
-func resetTestData(t *testing.T, database *db.DB) map[uuid.UUID]int64 {
+func resetTestData(t *testing.T, database *db.DB) (map[uuid.UUID]int64, string) {
 	t.Helper()
 
 	_, err := database.ExecContext(context.Background(),
-		"TRUNCATE TABLE webhook_deliveries, payment_events, transactions, idempotency_keys, accounts CASCADE")
+		"TRUNCATE TABLE webhook_deliveries, payment_events, transactions, idempotency_keys, api_keys, accounts, merchants CASCADE")
 	require.NoError(t, err, "failed to truncate tables")
+
+	merchant := models.Merchant{ID: models.DefaultMerchantID, Name: "default"}
+	require.NoError(t, database.GORM().Create(&merchant).Error, "failed to seed merchant")
+
+	generated, err := security.GenerateAPIKey()
+	require.NoError(t, err, "failed to generate test api key")
+
+	apiKey := models.APIKey{
+		ID:         uuid.New(),
+		MerchantID: models.DefaultMerchantID,
+		Name:       "integration-test",
+		KeyPrefix:  generated.Prefix,
+		KeyLast4:   generated.Last4,
+		KeyHash:    security.HashToken(generated.Raw),
+		Scopes:     pq.StringArray{models.ScopePayments, models.ScopeAdmin},
+	}
+	require.NoError(t, database.GORM().Create(&apiKey).Error, "failed to seed api key")
 
 	accounts := []models.Account{
 		{
@@ -105,7 +151,7 @@ func resetTestData(t *testing.T, database *db.DB) map[uuid.UUID]int64 {
 		initialBalances[account.ID] = account.BalanceCents
 	}
 
-	return initialBalances
+	return initialBalances, generated.Raw
 }
 
 // Authorize sends a POST request to create an authorization.
@@ -141,6 +187,7 @@ func (ts *TestServer) AuthorizeLinked(
 	req, err := http.NewRequest(http.MethodPost, ts.URL("/api/v1/authorizations"), bytes.NewReader(jsonBody))
 	require.NoError(t, err)
 
+	ts.AuthRequest(req)
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Idempotency-Key", idempotencyKey)
 
@@ -163,6 +210,7 @@ func (ts *TestServer) Capture(t *testing.T, authID string, amount int64, idempot
 	req, err := http.NewRequest(http.MethodPost, ts.URL("/api/v1/captures"), bytes.NewReader(jsonBody))
 	require.NoError(t, err)
 
+	ts.AuthRequest(req)
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Idempotency-Key", idempotencyKey)
 
@@ -184,6 +232,7 @@ func (ts *TestServer) Void(t *testing.T, authID string, idempotencyKey string) *
 	req, err := http.NewRequest(http.MethodPost, ts.URL("/api/v1/voids"), bytes.NewReader(jsonBody))
 	require.NoError(t, err)
 
+	ts.AuthRequest(req)
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Idempotency-Key", idempotencyKey)
 
@@ -206,6 +255,7 @@ func (ts *TestServer) Refund(t *testing.T, captureID string, amount int64, idemp
 	req, err := http.NewRequest(http.MethodPost, ts.URL("/api/v1/refunds"), bytes.NewReader(jsonBody))
 	require.NoError(t, err)
 
+	ts.AuthRequest(req)
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Idempotency-Key", idempotencyKey)
 

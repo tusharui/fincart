@@ -23,6 +23,7 @@ func NewRouter(
 	captureService := service.NewCaptureService(database)
 	voidService := service.NewVoidService(database)
 	refundService := service.NewRefundService(database)
+	apiKeyService := service.NewAuthService(database, cfg.Auth.LastUsedThrottle, logger)
 
 	handler := NewHandler(authService, captureService, voidService, refundService, database, logger)
 	strictHandler := api.NewStrictHandlerWithOptions(handler, nil, api.StrictHTTPServerOptions{
@@ -49,6 +50,7 @@ func NewRouter(
 
 	idempotencyRepo := repository.NewIdempotencyRepository(database.GORM())
 	finalHandler = middleware.Idempotency(idempotencyRepo, logger)(finalHandler)
+	finalHandler = middleware.APIKeyAuth(apiKeyService, cfg.Auth.Enabled, logger)(finalHandler)
 
 	// Request ID and access logging sit outside recovery so a panic is logged
 	// with its correlation ID and the resulting 500 is visible in the access

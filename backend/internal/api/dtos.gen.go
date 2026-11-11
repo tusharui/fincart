@@ -7,6 +7,10 @@ import (
 	"time"
 )
 
+const (
+	BearerAuthScopes = "bearerAuth.Scopes"
+)
+
 // Defines values for AuthorizationResponseStatus.
 const (
 	AuthorizationResponseStatusApproved AuthorizationResponseStatus = "approved"
@@ -33,6 +37,7 @@ const (
 	ErrorCodeCaptureNotCompleted      ErrorCode = "capture_not_completed"
 	ErrorCodeCaptureNotFound          ErrorCode = "capture_not_found"
 	ErrorCodeCardExpired              ErrorCode = "card_expired"
+	ErrorCodeForbidden                ErrorCode = "forbidden"
 	ErrorCodeIdempotencyInProgress    ErrorCode = "idempotency_in_progress"
 	ErrorCodeIdempotencyKeyConflict   ErrorCode = "idempotency_key_conflict"
 	ErrorCodeIdempotencyUnavailable   ErrorCode = "idempotency_unavailable"
@@ -47,6 +52,8 @@ const (
 	ErrorCodeNotFound                 ErrorCode = "not_found"
 	ErrorCodeRefundNotFound           ErrorCode = "refund_not_found"
 	ErrorCodeRequestTooLarge          ErrorCode = "request_too_large"
+	ErrorCodeServiceUnavailable       ErrorCode = "service_unavailable"
+	ErrorCodeUnauthorized             ErrorCode = "unauthorized"
 )
 
 // Defines values for HealthResponseStatus.
@@ -232,6 +239,9 @@ type BadRequest = ErrorResponse
 // Conflict defines model for Conflict.
 type Conflict = ErrorResponse
 
+// Forbidden defines model for Forbidden.
+type Forbidden = ErrorResponse
+
 // InternalError defines model for InternalError.
 type InternalError = ErrorResponse
 
@@ -246,6 +256,9 @@ type PaymentRequired = ErrorResponse
 
 // ServiceUnavailable defines model for ServiceUnavailable.
 type ServiceUnavailable = ErrorResponse
+
+// Unauthorized defines model for Unauthorized.
+type Unauthorized = ErrorResponse
 
 // CreateAuthorizationParams defines parameters for CreateAuthorization.
 type CreateAuthorizationParams struct {

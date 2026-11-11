@@ -120,8 +120,7 @@ func TestOrderCustomerLinkage_PropagatesThroughLifecycle(t *testing.T) {
 	assert.Equal(t, customerID.String(), authBody["customer_id"])
 	authID := authBody["authorization_id"].(string)
 
-	getAuth, err := http.Get(ts.URL("/api/v1/authorizations/" + authID))
-	require.NoError(t, err)
+	getAuth := ts.Get(t, "/api/v1/authorizations/"+authID)
 	require.Equal(t, http.StatusOK, getAuth.StatusCode)
 	var getAuthBody map[string]any
 	require.NoError(t, json.NewDecoder(getAuth.Body).Decode(&getAuthBody))
@@ -138,8 +137,7 @@ func TestOrderCustomerLinkage_PropagatesThroughLifecycle(t *testing.T) {
 	assert.Equal(t, customerID.String(), captureBody["customer_id"])
 	captureID := captureBody["capture_id"].(string)
 
-	getCapture, err := http.Get(ts.URL("/api/v1/captures/" + captureID))
-	require.NoError(t, err)
+	getCapture := ts.Get(t, "/api/v1/captures/"+captureID)
 	require.Equal(t, http.StatusOK, getCapture.StatusCode)
 	var getCaptureBody map[string]any
 	require.NoError(t, json.NewDecoder(getCapture.Body).Decode(&getCaptureBody))
@@ -156,8 +154,7 @@ func TestOrderCustomerLinkage_PropagatesThroughLifecycle(t *testing.T) {
 	assert.Equal(t, customerID.String(), refundBody["customer_id"])
 	refundID := refundBody["refund_id"].(string)
 
-	getRefund, err := http.Get(ts.URL("/api/v1/refunds/" + refundID))
-	require.NoError(t, err)
+	getRefund := ts.Get(t, "/api/v1/refunds/"+refundID)
 	require.Equal(t, http.StatusOK, getRefund.StatusCode)
 	var getRefundBody map[string]any
 	require.NoError(t, json.NewDecoder(getRefund.Body).Decode(&getRefundBody))
@@ -397,6 +394,7 @@ func TestIdempotency_MissingKeyIsRejected(t *testing.T) {
 		strings.NewReader(`{"card_number":"4111111111111111","cvv":"123","amount":10000}`),
 	)
 	require.NoError(t, err)
+	ts.AuthRequest(req)
 	req.Header.Set("Content-Type", "application/json")
 	// Intentionally no Idempotency-Key header.
 
@@ -514,8 +512,7 @@ func TestGetAuthorization(t *testing.T) {
 	authResp.Body.Close()
 	authID := authBody["authorization_id"].(string)
 
-	resp, err := http.Get(ts.URL("/api/v1/authorizations/" + authID))
-	require.NoError(t, err)
+	resp := ts.Get(t, "/api/v1/authorizations/"+authID)
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 
 	var getBody map[string]any
@@ -543,8 +540,7 @@ func TestGetAuthorization_AfterCapture(t *testing.T) {
 	require.Equal(t, http.StatusOK, captureResp.StatusCode)
 	captureResp.Body.Close()
 
-	resp, err := http.Get(ts.URL("/api/v1/authorizations/" + authID))
-	require.NoError(t, err)
+	resp := ts.Get(t, "/api/v1/authorizations/"+authID)
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 
 	var getBody map[string]any
@@ -570,8 +566,7 @@ func TestGetAuthorization_AfterVoid(t *testing.T) {
 	require.Equal(t, http.StatusOK, voidResp.StatusCode)
 	voidResp.Body.Close()
 
-	resp, err := http.Get(ts.URL("/api/v1/authorizations/" + authID))
-	require.NoError(t, err)
+	resp := ts.Get(t, "/api/v1/authorizations/"+authID)
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 
 	var getBody map[string]any
@@ -602,8 +597,7 @@ func TestGetCapture_AfterRefund(t *testing.T) {
 	captureID := captureBody["capture_id"].(string)
 
 	getCapture := func() map[string]any {
-		resp, err := http.Get(ts.URL("/api/v1/captures/" + captureID))
-		require.NoError(t, err)
+		resp := ts.Get(t, "/api/v1/captures/"+captureID)
 		require.Equal(t, http.StatusOK, resp.StatusCode)
 		defer resp.Body.Close()
 
@@ -625,8 +619,7 @@ func TestGetAuthorization_NotFound(t *testing.T) {
 	ts := SetupTest(t)
 	defer ts.Close()
 
-	resp, err := http.Get(ts.URL("/api/v1/authorizations/auth_00000000-0000-0000-0000-000000000000"))
-	require.NoError(t, err)
+	resp := ts.Get(t, "/api/v1/authorizations/auth_00000000-0000-0000-0000-000000000000")
 	require.Equal(t, http.StatusNotFound, resp.StatusCode)
 	resp.Body.Close()
 }

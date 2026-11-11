@@ -16,6 +16,7 @@ type Config struct {
 	Logger   LoggerConfig
 	Database DatabaseConfig
 	App      AppConfig
+	Auth     AuthConfig
 	Webhook  WebhookConfig
 }
 
@@ -59,6 +60,21 @@ type AppConfig struct {
 // LoggerConfig holds logging configuration
 type LoggerConfig struct {
 	Level string // debug, info, warn, error
+}
+
+// AuthConfig controls API key authentication.
+type AuthConfig struct {
+	// Enabled requires a valid Bearer API key on payment and management
+	// endpoints. Probes, metrics, and documentation stay public.
+	Enabled bool
+	// BootstrapKey is reconciled into a bootstrap API key at startup. When it
+	// is empty and no active keys exist, a random key is generated and logged
+	// once so a fresh deployment is still reachable.
+	BootstrapKey string
+	// BootstrapMerchant names the merchant the bootstrap key belongs to.
+	BootstrapMerchant string
+	// LastUsedThrottle bounds how often a key's last_used_at is written.
+	LastUsedThrottle time.Duration
 }
 
 // WebhookConfig controls outbound delivery of payment domain events.
@@ -108,6 +124,12 @@ func Load() (*Config, error) {
 		},
 		Logger: LoggerConfig{
 			Level: getEnv("LOG_LEVEL", "info"),
+		},
+		Auth: AuthConfig{
+			Enabled:           getEnvAsBool("AUTH_ENABLED", true),
+			BootstrapKey:      getEnv("AUTH_BOOTSTRAP_KEY", ""),
+			BootstrapMerchant: getEnv("AUTH_BOOTSTRAP_MERCHANT", "default"),
+			LastUsedThrottle:  getEnvAsDuration("AUTH_LAST_USED_THROTTLE", "1m"),
 		},
 		Webhook: WebhookConfig{
 			Enabled:       getEnvAsBool("WEBHOOK_ENABLED", false),
@@ -161,8 +183,30 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("invalid log level: %s (must be debug, info, warn, or error)", c.Logger.Level)
 	}
 
+	if err := c.Auth.validate(); err != nil {
+		return err
+	}
+
 	if err := c.Webhook.validate(); err != nil {
 		return err
+	}
+
+	return nil
+}
+
+// validate checks API authentication settings. A bootstrap key is optional as
+// long as an operator provisions keys another way, but a configured one must
+// be long enough to resist guessing.
+func (a *AuthConfig) validate() error {
+	if a.BootstrapKey != "" && len(a.BootstrapKey) < 16 {
+		return fmt.Errorf("auth bootstrap key must be at least 16 characters")
+	}
+
+	if a.BootstrapMerchant == "" {
+		return fmt.Errorf("auth bootstrap merchant cannot be empty")
+	}
+	if a.LastUsedThrottle <= 0 {
+		return fmt.Errorf("auth last used throttle must be positive")
 	}
 
 	return nil

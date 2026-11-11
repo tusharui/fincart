@@ -7,6 +7,8 @@ info:
     This mock Bank API provides basic functionality to test payment flows without real money transactions.
 
     All POST endpoints require an Idempotency-Key header.
+    All /api/v1 endpoints require a Bearer API key. Keys are scoped to a
+    merchant, and payment data is isolated per merchant.
 
     Failure injection (synthetic 500s and added latency) is disabled by default.
     Set CHAOS_ENABLED=true to opt in, then configure FAILURE_RATE,
@@ -16,6 +18,9 @@ info:
 servers:
   - url: http://localhost:8787
     description: Local development server
+
+security:
+  - bearerAuth: []
 
 tags:
   - name: Health
@@ -39,6 +44,7 @@ paths:
         check downstream dependencies, so an unhealthy database does not cause
         the orchestrator to restart a healthy process.
       tags: [Health]
+      security: []
       responses:
         '200':
           description: Health status
@@ -62,6 +68,7 @@ paths:
         database is unreachable so load balancers stop routing to this instance
         until the dependency recovers.
       tags: [Health]
+      security: []
       responses:
         '200':
           description: Service is ready to accept traffic
@@ -91,6 +98,10 @@ paths:
             schema:
               $ref: '#/components/schemas/CreateAuthorizationRequest'
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: Authorization created
           content:
@@ -118,6 +129,10 @@ paths:
       parameters:
         - $ref: '#/components/parameters/AuthorizationId'
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: Authorization found
           content:
@@ -142,6 +157,10 @@ paths:
             schema:
               $ref: '#/components/schemas/CreateCaptureRequest'
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: Capture created
           content:
@@ -169,6 +188,10 @@ paths:
       parameters:
         - $ref: '#/components/parameters/CaptureId'
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: Capture found
           content:
@@ -193,6 +216,10 @@ paths:
             schema:
               $ref: '#/components/schemas/CreateVoidRequest'
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: Void created
           content:
@@ -227,6 +254,10 @@ paths:
             schema:
               $ref: '#/components/schemas/CreateRefundRequest'
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: Refund created
           content:
@@ -254,6 +285,10 @@ paths:
       parameters:
         - $ref: '#/components/parameters/RefundId'
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: Refund found
           content:
@@ -264,6 +299,19 @@ paths:
           $ref: '#/components/responses/NotFound'
 
 components:
+  # ============================================================================
+  # Security
+  # ============================================================================
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: APIKey
+      description: |
+        Merchant API key issued by the bank. Send it as
+        `Authorization: Bearer <key>`. The raw key is shown only once when it is
+        created or rotated.
+
   # ============================================================================
   # Parameters
   # ============================================================================
@@ -363,6 +411,9 @@ components:
         - capture_not_found
         - capture_not_completed
         - refund_not_found
+        - unauthorized
+        - forbidden
+        - service_unavailable
         - not_found
         - internal_error
 
@@ -592,6 +643,18 @@ components:
   # Responses
   # ============================================================================
   responses:
+    Unauthorized:
+      description: Missing, invalid, revoked, or expired API key
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Forbidden:
+      description: The API key does not grant the scope required by this endpoint
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
     BadRequest:
       description: Validation or business logic error
       content:

@@ -131,6 +131,7 @@ func TestConfig_Validate(t *testing.T) {
 			Server:   ServerConfig{Port: "8080"},
 			Database: DatabaseConfig{URL: "postgresql://user:pass@example.com/db"},
 			App:      AppConfig{MinLatencyMS: 0, MaxLatencyMS: 0},
+			Auth:     AuthConfig{BootstrapMerchant: "default", LastUsedThrottle: time.Minute},
 			Logger:   LoggerConfig{Level: "info"},
 		}
 
@@ -142,9 +143,78 @@ func TestConfig_Validate(t *testing.T) {
 			Server:   ServerConfig{Port: "8080"},
 			Database: DatabaseConfig{},
 			App:      AppConfig{MinLatencyMS: 0, MaxLatencyMS: 0},
+			Auth:     AuthConfig{BootstrapMerchant: "default", LastUsedThrottle: time.Minute},
 			Logger:   LoggerConfig{Level: "info"},
 		}
 
 		require.Error(t, cfg.Validate())
 	})
+}
+
+func TestLoad_AuthDefaults(t *testing.T) {
+	t.Setenv("AUTH_ENABLED", "")
+	t.Setenv("AUTH_BOOTSTRAP_KEY", "")
+	t.Setenv("AUTH_BOOTSTRAP_MERCHANT", "")
+	t.Setenv("AUTH_LAST_USED_THROTTLE", "")
+
+	cfg, err := Load()
+	require.NoError(t, err)
+
+	assert.True(t, cfg.Auth.Enabled, "authentication must be on by default")
+	assert.Empty(t, cfg.Auth.BootstrapKey)
+	assert.Equal(t, "default", cfg.Auth.BootstrapMerchant)
+	assert.Equal(t, time.Minute, cfg.Auth.LastUsedThrottle)
+}
+
+func TestLoad_AuthReadsExplicitSettings(t *testing.T) {
+	t.Setenv("AUTH_ENABLED", "false")
+	t.Setenv("AUTH_BOOTSTRAP_KEY", "bootstrap-secret-value")
+	t.Setenv("AUTH_BOOTSTRAP_MERCHANT", "acme")
+	t.Setenv("AUTH_LAST_USED_THROTTLE", "30s")
+
+	cfg, err := Load()
+	require.NoError(t, err)
+
+	assert.False(t, cfg.Auth.Enabled)
+	assert.Equal(t, "bootstrap-secret-value", cfg.Auth.BootstrapKey)
+	assert.Equal(t, "acme", cfg.Auth.BootstrapMerchant)
+	assert.Equal(t, 30*time.Second, cfg.Auth.LastUsedThrottle)
+}
+
+func TestAuthConfig_Validate(t *testing.T) {
+	valid := func() AuthConfig {
+		return AuthConfig{
+			Enabled:           true,
+			BootstrapMerchant: "default",
+			LastUsedThrottle:  time.Minute,
+		}
+	}
+
+	t.Run("accepts defaults without a bootstrap key", func(t *testing.T) {
+		cfg := valid()
+		require.NoError(t, cfg.validate())
+	})
+
+	t.Run("accepts a strong bootstrap key", func(t *testing.T) {
+		cfg := valid()
+		cfg.BootstrapKey = "0123456789abcdef"
+		require.NoError(t, cfg.validate())
+	})
+
+	tests := []struct {
+		name   string
+		mutate func(*AuthConfig)
+	}{
+		{"rejects a short bootstrap key", func(c *AuthConfig) { c.BootstrapKey = "short" }},
+		{"requires a bootstrap merchant", func(c *AuthConfig) { c.BootstrapMerchant = "" }},
+		{"requires a positive last used throttle", func(c *AuthConfig) { c.LastUsedThrottle = 0 }},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := valid()
+			tt.mutate(&cfg)
+			assert.Error(t, cfg.validate())
+		})
+	}
 }

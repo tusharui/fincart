@@ -15,6 +15,7 @@ import (
 	"github.com/tusharui/payment-gateway/backend/internal/db"
 	"github.com/tusharui/payment-gateway/backend/internal/handlers"
 	"github.com/tusharui/payment-gateway/backend/internal/repository"
+	"github.com/tusharui/payment-gateway/backend/internal/security"
 	"github.com/tusharui/payment-gateway/backend/internal/service"
 	"github.com/tusharui/payment-gateway/backend/internal/webhook"
 )
@@ -53,6 +54,11 @@ func main() {
 			logger.Error("failed to close database connection", "error", err)
 		}
 	}()
+
+	if err := configureAuth(ctx, cfg, database, logger); err != nil {
+		logger.Error("failed to configure api authentication", "error", err)
+		os.Exit(1)
+	}
 
 	// Stop background workers before the database connection is closed.
 	workerCtx, stopWorkers := context.WithCancel(context.Background())
@@ -109,6 +115,60 @@ func main() {
 	}
 
 	logger.Info("server stopped")
+}
+
+// configureAuth reconciles the bootstrap API key. A configured key is stable
+// across restarts; otherwise an existing key is reused. On a brand-new database
+// with no keys and no bootstrap configuration, a random key is created and
+// logged once so the API is not locked out.
+func configureAuth(ctx context.Context, cfg *config.Config, database *db.DB, logger *slog.Logger) error {
+	if !cfg.Auth.Enabled {
+		logger.Warn("api key authentication is disabled", "hint", "set AUTH_ENABLED=true to require API keys")
+		return nil
+	}
+
+	authService := service.NewAuthService(database, cfg.Auth.LastUsedThrottle, logger)
+
+	if cfg.Auth.BootstrapKey != "" {
+		key, err := authService.EnsureBootstrap(ctx, cfg.Auth.BootstrapKey, cfg.Auth.BootstrapMerchant)
+		if err != nil {
+			return err
+		}
+
+		logger.Info("bootstrap api key reconciled",
+			"key_id", key.ID,
+			"prefix", key.KeyPrefix,
+			"merchant_id", key.MerchantID,
+		)
+		return nil
+	}
+
+	activeKeys, err := authService.ActiveKeyCount(ctx)
+	if err != nil {
+		return err
+	}
+	if activeKeys > 0 {
+		logger.Info("api key authentication enabled", "active_keys", activeKeys)
+		return nil
+	}
+
+	generated, err := security.GenerateAPIKey()
+	if err != nil {
+		return err
+	}
+
+	key, err := authService.EnsureBootstrap(ctx, generated.Raw, cfg.Auth.BootstrapMerchant)
+	if err != nil {
+		return err
+	}
+
+	logger.Warn("generated one-time bootstrap api key because no active key exists",
+		"api_key", generated.Raw,
+		"key_id", key.ID,
+		"hint", "set AUTH_BOOTSTRAP_KEY to keep the bootstrap credential stable",
+	)
+
+	return nil
 }
 
 // cleanupIdempotencyKeys removes idempotency keys older than 24 hours

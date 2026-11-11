@@ -43,6 +43,12 @@ services:
       MIN_LATENCY_MS: 100
       MAX_LATENCY_MS: 2000
       AUTH_EXPIRY_HOURS: 168
+      # API key authentication is on by default. The demo stack pins a stable
+      # bootstrap key so restarts and recreated volumes keep the same
+      # credential. Change this value outside local demos.
+      AUTH_ENABLED: "true"
+      AUTH_BOOTSTRAP_KEY: "bk_demo_bootstrap_key_change_me"
+      AUTH_BOOTSTRAP_MERCHANT: "default"
       LOG_LEVEL: debug
     ports:
       - "8787:8080"

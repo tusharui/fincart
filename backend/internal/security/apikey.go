@@ -24,6 +24,22 @@ type GeneratedAPIKey struct {
 	Last4  string
 }
 
+// DescribeAPIKey derives the non-secret prefix and last four characters shown
+// in listings for an arbitrary raw key.
+func DescribeAPIKey(raw string) (prefix, last4 string) {
+	prefix = raw
+	if len(prefix) > 11 {
+		prefix = prefix[:11]
+	}
+
+	last4 = raw
+	if len(last4) > 4 {
+		last4 = last4[len(last4)-4:]
+	}
+
+	return prefix, last4
+}
+
 // GenerateAPIKey creates a cryptographically random API key. The raw value is
 // returned to the caller once; only its SHA-256 hash should be stored.
 func GenerateAPIKey() (GeneratedAPIKey, error) {
@@ -33,11 +49,12 @@ func GenerateAPIKey() (GeneratedAPIKey, error) {
 	}
 
 	raw := APIKeyPrefix + hex.EncodeToString(random)
+	prefix, last4 := DescribeAPIKey(raw)
 
 	return GeneratedAPIKey{
 		Raw:    raw,
-		Prefix: raw[:11],
-		Last4:  raw[len(raw)-4:],
+		Prefix: prefix,
+		Last4:  last4,
 	}, nil
 }
 

@@ -87,8 +87,7 @@ func TestObservability_MetricsCaptureTraffic(t *testing.T) {
 	require.Equal(t, http.StatusBadRequest, failedCapture.StatusCode)
 	failedCapture.Body.Close()
 
-	notFound, err := http.Get(ts.URL("/no-such-route"))
-	require.NoError(t, err)
+	notFound := ts.Get(t, "/no-such-route")
 	notFound.Body.Close()
 	require.Equal(t, http.StatusNotFound, notFound.StatusCode)
 
@@ -148,6 +147,7 @@ func TestObservability_ErrorResponsesKeepJSONShape(t *testing.T) {
 	req, err := http.NewRequest(http.MethodPost, ts.URL("/api/v1/authorizations"),
 		strings.NewReader(`{"card_number":"4111111111111111","cvv":"123","amount":100}`))
 	require.NoError(t, err)
+	ts.AuthRequest(req)
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := http.DefaultClient.Do(req)
