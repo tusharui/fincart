@@ -218,3 +218,37 @@ func TestAuthConfig_Validate(t *testing.T) {
 		})
 	}
 }
+
+func TestLoad_RateLimitDefaults(t *testing.T) {
+	t.Setenv("RATE_LIMIT_ENABLED", "")
+	t.Setenv("RATE_LIMIT_DEFAULT_PER_MINUTE", "")
+
+	cfg, err := Load()
+	require.NoError(t, err)
+
+	assert.True(t, cfg.RateLimit.Enabled)
+	assert.Equal(t, 120, cfg.RateLimit.DefaultPerMinute)
+}
+
+func TestLoad_RateLimitReadsExplicitSettings(t *testing.T) {
+	t.Setenv("RATE_LIMIT_ENABLED", "false")
+	t.Setenv("RATE_LIMIT_DEFAULT_PER_MINUTE", "30")
+
+	cfg, err := Load()
+	require.NoError(t, err)
+
+	assert.False(t, cfg.RateLimit.Enabled)
+	assert.Equal(t, 30, cfg.RateLimit.DefaultPerMinute)
+}
+
+func TestRateLimitConfig_Validate(t *testing.T) {
+	t.Run("accepts zero as unlimited", func(t *testing.T) {
+		cfg := RateLimitConfig{Enabled: true, DefaultPerMinute: 0}
+		require.NoError(t, cfg.validate())
+	})
+
+	t.Run("rejects a negative default", func(t *testing.T) {
+		cfg := RateLimitConfig{Enabled: true, DefaultPerMinute: -1}
+		require.Error(t, cfg.validate())
+	})
+}

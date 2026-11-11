@@ -50,6 +50,10 @@ func SetupTest(t *testing.T) *TestServer {
 	cfg.App.MinLatencyMS = 0
 	cfg.App.MaxLatencyMS = 0
 
+	// Integration tests burst many requests from a single key. Rate limiting is
+	// covered by its own tests, so the shared harness opts out.
+	cfg.RateLimit.Enabled = false
+
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 
 	database, err := db.Connect(context.Background(), &cfg.Database, logger)

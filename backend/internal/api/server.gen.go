@@ -525,6 +525,15 @@ type PaymentRequiredJSONResponse ErrorResponse
 
 type ServiceUnavailableJSONResponse ErrorResponse
 
+type TooManyRequestsResponseHeaders struct {
+	RetryAfter int
+}
+type TooManyRequestsJSONResponse struct {
+	Body ErrorResponse
+
+	Headers TooManyRequestsResponseHeaders
+}
+
 type UnauthorizedJSONResponse ErrorResponse
 
 type CreateAuthorizationRequestObject struct {
@@ -599,6 +608,16 @@ func (response CreateAuthorization413JSONResponse) VisitCreateAuthorizationRespo
 	return json.NewEncoder(w).Encode(response)
 }
 
+type CreateAuthorization429JSONResponse struct{ TooManyRequestsJSONResponse }
+
+func (response CreateAuthorization429JSONResponse) VisitCreateAuthorizationResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Retry-After", fmt.Sprint(response.Headers.RetryAfter))
+	w.WriteHeader(429)
+
+	return json.NewEncoder(w).Encode(response.Body)
+}
+
 type CreateAuthorization500JSONResponse struct{ InternalErrorJSONResponse }
 
 func (response CreateAuthorization500JSONResponse) VisitCreateAuthorizationResponse(w http.ResponseWriter) error {
@@ -659,6 +678,16 @@ func (response GetAuthorization404JSONResponse) VisitGetAuthorizationResponse(w 
 	w.WriteHeader(404)
 
 	return json.NewEncoder(w).Encode(response)
+}
+
+type GetAuthorization429JSONResponse struct{ TooManyRequestsJSONResponse }
+
+func (response GetAuthorization429JSONResponse) VisitGetAuthorizationResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Retry-After", fmt.Sprint(response.Headers.RetryAfter))
+	w.WriteHeader(429)
+
+	return json.NewEncoder(w).Encode(response.Body)
 }
 
 type CreateCaptureRequestObject struct {
@@ -733,6 +762,16 @@ func (response CreateCapture413JSONResponse) VisitCreateCaptureResponse(w http.R
 	return json.NewEncoder(w).Encode(response)
 }
 
+type CreateCapture429JSONResponse struct{ TooManyRequestsJSONResponse }
+
+func (response CreateCapture429JSONResponse) VisitCreateCaptureResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Retry-After", fmt.Sprint(response.Headers.RetryAfter))
+	w.WriteHeader(429)
+
+	return json.NewEncoder(w).Encode(response.Body)
+}
+
 type CreateCapture500JSONResponse struct{ InternalErrorJSONResponse }
 
 func (response CreateCapture500JSONResponse) VisitCreateCaptureResponse(w http.ResponseWriter) error {
@@ -793,6 +832,16 @@ func (response GetCapture404JSONResponse) VisitGetCaptureResponse(w http.Respons
 	w.WriteHeader(404)
 
 	return json.NewEncoder(w).Encode(response)
+}
+
+type GetCapture429JSONResponse struct{ TooManyRequestsJSONResponse }
+
+func (response GetCapture429JSONResponse) VisitGetCaptureResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Retry-After", fmt.Sprint(response.Headers.RetryAfter))
+	w.WriteHeader(429)
+
+	return json.NewEncoder(w).Encode(response.Body)
 }
 
 type CreateRefundRequestObject struct {
@@ -867,6 +916,16 @@ func (response CreateRefund413JSONResponse) VisitCreateRefundResponse(w http.Res
 	return json.NewEncoder(w).Encode(response)
 }
 
+type CreateRefund429JSONResponse struct{ TooManyRequestsJSONResponse }
+
+func (response CreateRefund429JSONResponse) VisitCreateRefundResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Retry-After", fmt.Sprint(response.Headers.RetryAfter))
+	w.WriteHeader(429)
+
+	return json.NewEncoder(w).Encode(response.Body)
+}
+
 type CreateRefund500JSONResponse struct{ InternalErrorJSONResponse }
 
 func (response CreateRefund500JSONResponse) VisitCreateRefundResponse(w http.ResponseWriter) error {
@@ -927,6 +986,16 @@ func (response GetRefund404JSONResponse) VisitGetRefundResponse(w http.ResponseW
 	w.WriteHeader(404)
 
 	return json.NewEncoder(w).Encode(response)
+}
+
+type GetRefund429JSONResponse struct{ TooManyRequestsJSONResponse }
+
+func (response GetRefund429JSONResponse) VisitGetRefundResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Retry-After", fmt.Sprint(response.Headers.RetryAfter))
+	w.WriteHeader(429)
+
+	return json.NewEncoder(w).Encode(response.Body)
 }
 
 type CreateVoidRequestObject struct {
@@ -999,6 +1068,16 @@ func (response CreateVoid413JSONResponse) VisitCreateVoidResponse(w http.Respons
 	w.WriteHeader(413)
 
 	return json.NewEncoder(w).Encode(response)
+}
+
+type CreateVoid429JSONResponse struct{ TooManyRequestsJSONResponse }
+
+func (response CreateVoid429JSONResponse) VisitCreateVoidResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Retry-After", fmt.Sprint(response.Headers.RetryAfter))
+	w.WriteHeader(429)
+
+	return json.NewEncoder(w).Encode(response.Body)
 }
 
 type CreateVoid500JSONResponse struct{ InternalErrorJSONResponse }

@@ -102,6 +102,8 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '200':
           description: Authorization created
           content:
@@ -133,6 +135,8 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '200':
           description: Authorization found
           content:
@@ -161,6 +165,8 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '200':
           description: Capture created
           content:
@@ -192,6 +198,8 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '200':
           description: Capture found
           content:
@@ -220,6 +228,8 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '200':
           description: Void created
           content:
@@ -258,6 +268,8 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '200':
           description: Refund created
           content:
@@ -289,6 +301,8 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '200':
           description: Refund found
           content:
@@ -413,6 +427,7 @@ components:
         - refund_not_found
         - unauthorized
         - forbidden
+        - rate_limited
         - service_unavailable
         - not_found
         - internal_error
@@ -651,6 +666,17 @@ components:
             $ref: '#/components/schemas/ErrorResponse'
     Forbidden:
       description: The API key does not grant the scope required by this endpoint
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    TooManyRequests:
+      description: The API key exceeded its request rate limit
+      headers:
+        Retry-After:
+          description: Seconds to wait before retrying
+          schema:
+            type: integer
       content:
         application/json:
           schema:

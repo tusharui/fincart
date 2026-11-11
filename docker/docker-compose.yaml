@@ -49,6 +49,10 @@ services:
       AUTH_ENABLED: "true"
       AUTH_BOOTSTRAP_KEY: "bk_demo_bootstrap_key_change_me"
       AUTH_BOOTSTRAP_MERCHANT: "default"
+      # Per-key token buckets. Zero means unlimited for keys without their own
+      # limit; the demo keeps the default so throttling is visible.
+      RATE_LIMIT_ENABLED: "true"
+      RATE_LIMIT_DEFAULT_PER_MINUTE: 120
       LOG_LEVEL: debug
     ports:
       - "8787:8080"

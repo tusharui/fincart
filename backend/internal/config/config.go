@@ -12,12 +12,13 @@ import (
 
 // Config holds all application configuration
 type Config struct {
-	Server   ServerConfig
-	Logger   LoggerConfig
-	Database DatabaseConfig
-	App      AppConfig
-	Auth     AuthConfig
-	Webhook  WebhookConfig
+	Server    ServerConfig
+	Logger    LoggerConfig
+	Database  DatabaseConfig
+	App       AppConfig
+	Auth      AuthConfig
+	RateLimit RateLimitConfig
+	Webhook   WebhookConfig
 }
 
 // ServerConfig holds HTTP server configuration
@@ -77,6 +78,15 @@ type AuthConfig struct {
 	LastUsedThrottle time.Duration
 }
 
+// RateLimitConfig controls per-credential request throttling.
+type RateLimitConfig struct {
+	// Enabled enforces a token bucket for every authenticated API key.
+	Enabled bool
+	// DefaultPerMinute applies when a key has no explicit limit. Zero means
+	// unlimited for such keys.
+	DefaultPerMinute int
+}
+
 // WebhookConfig controls outbound delivery of payment domain events.
 type WebhookConfig struct {
 	Enabled       bool
@@ -130,6 +140,10 @@ func Load() (*Config, error) {
 			BootstrapKey:      getEnv("AUTH_BOOTSTRAP_KEY", ""),
 			BootstrapMerchant: getEnv("AUTH_BOOTSTRAP_MERCHANT", "default"),
 			LastUsedThrottle:  getEnvAsDuration("AUTH_LAST_USED_THROTTLE", "1m"),
+		},
+		RateLimit: RateLimitConfig{
+			Enabled:          getEnvAsBool("RATE_LIMIT_ENABLED", true),
+			DefaultPerMinute: getEnvAsInt("RATE_LIMIT_DEFAULT_PER_MINUTE", 120),
 		},
 		Webhook: WebhookConfig{
 			Enabled:       getEnvAsBool("WEBHOOK_ENABLED", false),
@@ -187,6 +201,10 @@ func (c *Config) Validate() error {
 		return err
 	}
 
+	if err := c.RateLimit.validate(); err != nil {
+		return err
+	}
+
 	if err := c.Webhook.validate(); err != nil {
 		return err
 	}
@@ -207,6 +225,16 @@ func (a *AuthConfig) validate() error {
 	}
 	if a.LastUsedThrottle <= 0 {
 		return fmt.Errorf("auth last used throttle must be positive")
+	}
+
+	return nil
+}
+
+// validate checks that rate limiting settings are coherent. A negative default
+// is meaningless; zero is the documented "unlimited" value.
+func (r *RateLimitConfig) validate() error {
+	if r.DefaultPerMinute < 0 {
+		return fmt.Errorf("rate limit default per minute cannot be negative")
 	}
 
 	return nil

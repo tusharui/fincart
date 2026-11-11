@@ -10,6 +10,7 @@ import (
 	"github.com/tusharui/payment-gateway/backend/internal/db"
 	"github.com/tusharui/payment-gateway/backend/internal/middleware"
 	"github.com/tusharui/payment-gateway/backend/internal/observability"
+	"github.com/tusharui/payment-gateway/backend/internal/ratelimit"
 	"github.com/tusharui/payment-gateway/backend/internal/repository"
 	"github.com/tusharui/payment-gateway/backend/internal/service"
 )
@@ -53,6 +54,12 @@ func NewRouter(
 		return repository.NewIdempotencyRepository(database.GORM(), merchantID)
 	}
 	finalHandler = middleware.Idempotency(idempotencyRepo, logger)(finalHandler)
+	finalHandler = middleware.RateLimit(
+		ratelimit.NewLimiter(),
+		cfg.RateLimit.Enabled,
+		cfg.RateLimit.DefaultPerMinute,
+		logger,
+	)(finalHandler)
 	finalHandler = middleware.APIKeyAuth(apiKeyService, cfg.Auth.Enabled, logger)(finalHandler)
 
 	// Request ID and access logging sit outside recovery so a panic is logged

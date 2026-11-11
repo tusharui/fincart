@@ -50,6 +50,7 @@ const (
 	ErrorCodeInvalidRequest           ErrorCode = "invalid_request"
 	ErrorCodeMissingIdempotencyKey    ErrorCode = "missing_idempotency_key"
 	ErrorCodeNotFound                 ErrorCode = "not_found"
+	ErrorCodeRateLimited              ErrorCode = "rate_limited"
 	ErrorCodeRefundNotFound           ErrorCode = "refund_not_found"
 	ErrorCodeRequestTooLarge          ErrorCode = "request_too_large"
 	ErrorCodeServiceUnavailable       ErrorCode = "service_unavailable"
@@ -256,6 +257,9 @@ type PaymentRequired = ErrorResponse
 
 // ServiceUnavailable defines model for ServiceUnavailable.
 type ServiceUnavailable = ErrorResponse
+
+// TooManyRequests defines model for TooManyRequests.
+type TooManyRequests = ErrorResponse
 
 // Unauthorized defines model for Unauthorized.
 type Unauthorized = ErrorResponse
